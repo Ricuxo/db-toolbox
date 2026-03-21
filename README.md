@@ -14,7 +14,7 @@ This repository centralizes scripts and tools used in day-to-day database admini
 
 It is designed to:
 
-* Organize scripts by database technology
+* Organize scripts by database technology and domain
 * Facilitate reuse and versioning
 * Enable script transport across restricted environments
 * Keep automation simple and maintainable
@@ -28,18 +28,21 @@ db-toolbox/
 │
 ├── db/
 │   ├── oracle/
+│   │   ├── sql/
+│   │   │   ├── sessions/
+│   │   │   ├── tablespaces/
+│   │   │   ├── objects/
+│   │   │   ├── performance/
+│   │   │   ├── dataguard/
+│   │   │   ├── asm/
+│   │   │   ├── rman/
+│   │   │   ├── parameters/
+│   │   │   └── system/
+│   │   │
 │   │   └── scripts/
-│   │       ├── dataguard/
-│   │       ├── rman/
-│   │       ├── performance/
-│   │       ├── maintenance/
-│   │       └── duplicate_database/
 │   │
 │   ├── mongo/
 │   │   └── scripts/
-│   │       ├── collect_users.js
-│   │       ├── collect_roles.js
-│   │       └── check_replica.js
 │   │
 │   └── sql/
 │       ├── scripts/
@@ -49,6 +52,12 @@ db-toolbox/
 │   └── shell/
 │       ├── oracle/
 │       └── mongo/
+│
+├── ansible/
+│   └── projects/
+│       └── ansible-oracle/
+│           ├── playbooks/
+│           └── roles/
 │
 ├── templates/
 └── README.md
@@ -60,11 +69,30 @@ db-toolbox/
 
 ### 🔹 db/
 
-Database-specific scripts organized by technology.
+Database-specific scripts organized by technology and domain.
 
-* **oracle/**: Oracle operations (Data Guard, RMAN, performance, maintenance)
-* **mongo/**: MongoDB scripts for administration and diagnostics
-* **sql/**: Generic SQL scripts and reports
+#### Oracle
+
+* SQL scripts organized by domain:
+
+  * `sessions/`
+  * `tablespaces/`
+  * `objects/`
+  * `performance/`
+  * `dataguard/`
+  * `asm/`
+  * `rman/`
+  * `parameters/`
+  * `system/`
+* Shell scripts in `scripts/`
+
+#### Mongo
+
+* Administrative and diagnostic scripts in `scripts/`
+
+#### SQL
+
+* Generic SQL scripts and reports not tied to a specific database
 
 ---
 
@@ -77,13 +105,18 @@ Executable scripts responsible for orchestration.
 
 ---
 
+### 🔹 ansible/
+
+Infrastructure automation.
+
+* `projects/`: isolated Ansible projects
+* Example: `ansible-oracle`
+
+---
+
 ### 🔹 templates/
 
 Reusable templates for creating new scripts.
-
-* Shell script templates
-* SQL templates
-* Standardized script structure
 
 ---
 
@@ -91,7 +124,6 @@ Reusable templates for creating new scripts.
 
 ```bash
 git pull
-# edit or add scripts
 git add .
 git commit -m "feat: add new script"
 git pull --rebase
@@ -103,10 +135,10 @@ git push
 ## 🧾 Best Practices
 
 * Keep scripts simple and focused
-* Organize by database and purpose
+* Organize SQL by domain (not by script type)
 * Avoid unnecessary abstraction
-* Use consistent naming conventions
 * Prefer direct execution over complex dependencies
+* Separate orchestration (shell) from execution (SQL/JS)
 
 ---
 
@@ -126,11 +158,15 @@ This repository may be mirrored to cloud storage for file transfer purposes.
 
 ---
 
-## 🚀 Future Improvements
+## 🚀 Publishing Strategy
 
-* Script naming standardization
-* Advanced automation workflows
-* Expansion toward DBRE practices
+This repository is intended for internal and personal usage.
+
+For public sharing:
+
+* Extract reusable components into separate repositories
+* Clean and document before publishing
+* Reference public repositories in blog posts
 
 ---
 
