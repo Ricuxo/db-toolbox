@@ -14,10 +14,10 @@ This repository centralizes scripts and tools used in day-to-day database admini
 
 It is designed to:
 
-* Organize scripts by technology and purpose
-* Enable safe versioning and reuse
-* Facilitate script transport across restricted environments
-* Serve as a personal DBA toolbox
+* Organize scripts by database technology
+* Facilitate reuse and versioning
+* Enable script transport across restricted environments
+* Keep automation simple and maintainable
 
 ---
 
@@ -28,32 +28,28 @@ db-toolbox/
 │
 ├── db/
 │   ├── oracle/
-│   │   ├── dataguard/
-│   │   ├── rman/
-│   │   ├── performance/
-│   │   ├── maintenance/
-│   │   └── duplicate_database/
+│   │   └── scripts/
+│   │       ├── dataguard/
+│   │       ├── rman/
+│   │       ├── performance/
+│   │       ├── maintenance/
+│   │       └── duplicate_database/
 │   │
 │   ├── mongo/
-│   │   ├── scripts/
-│   │   ├── monitoring/
-│   │   └── admin/
+│   │   └── scripts/
+│   │       ├── collect_users.js
+│   │       ├── collect_roles.js
+│   │       └── check_replica.js
 │   │
 │   └── sql/
 │       ├── scripts/
 │       └── reports/
 │
-├── ansible/
-│   ├── ansible-oracle/
-│   ├── playbooks/
-│   └── roles/
-│
 ├── automation/
-│   ├── shell/
-│   ├── python/
-│   └── monitoring/
+│   └── shell/
+│       ├── oracle/
+│       └── mongo/
 │
-├── utils/
 ├── templates/
 └── README.md
 ```
@@ -64,43 +60,30 @@ db-toolbox/
 
 ### 🔹 db/
 
-Database-related scripts grouped by technology:
+Database-specific scripts organized by technology.
 
-* **oracle/**: Oracle database operations (Data Guard, RMAN, performance, maintenance)
-* **mongo/**: MongoDB administration, monitoring, and operational scripts
-* **sql/**: Generic SQL scripts and reporting queries
-
----
-
-### 🔹 ansible/
-
-Infrastructure automation using Ansible:
-
-* Playbooks
-* Roles
-* Oracle-related automation
+* **oracle/**: Oracle operations (Data Guard, RMAN, performance, maintenance)
+* **mongo/**: MongoDB scripts for administration and diagnostics
+* **sql/**: Generic SQL scripts and reports
 
 ---
 
 ### 🔹 automation/
 
-General-purpose automation scripts:
+Executable scripts responsible for orchestration.
 
-* Shell scripts
-* Python scripts
-* Monitoring utilities
-
----
-
-### 🔹 utils/
-
-Reusable helper scripts and utilities.
+* Shell scripts that call database scripts
+* Entry points for operational workflows
 
 ---
 
 ### 🔹 templates/
 
-Base templates to standardize new scripts.
+Reusable templates for creating new scripts.
+
+* Shell script templates
+* SQL templates
+* Standardized script structure
 
 ---
 
@@ -110,7 +93,7 @@ Base templates to standardize new scripts.
 git pull
 # edit or add scripts
 git add .
-git commit -m "feat: add new monitoring script"
+git commit -m "feat: add new script"
 git pull --rebase
 git push
 ```
@@ -119,35 +102,35 @@ git push
 
 ## 🧾 Best Practices
 
-* Use descriptive and consistent naming
-* Keep scripts organized by domain and purpose
-* Avoid committing temporary or environment-specific files
-* Document complex scripts when necessary
+* Keep scripts simple and focused
+* Organize by database and purpose
+* Avoid unnecessary abstraction
+* Use consistent naming conventions
+* Prefer direct execution over complex dependencies
 
 ---
 
 ## 🔐 Security Guidelines
 
-* Do NOT store credentials, passwords, or sensitive data
-* Use `.gitignore` to exclude local or confidential files
+* Do NOT store credentials or sensitive data
+* Use `.gitignore` to exclude local files
 * Sanitize scripts before sharing externally
 
 ---
 
 ## ☁️ Synchronization Note
 
-This repository may be mirrored to cloud storage tools for file transfer purposes.
+This repository may be mirrored to cloud storage for file transfer purposes.
 
-> ⚠️ Avoid using synchronized folders as your primary development workspace.
+> ⚠️ Avoid using synchronized folders as your primary development environment.
 
 ---
 
 ## 🚀 Future Improvements
 
-* Environment-based organization (DEV / HML / PRD)
-* Script standardization and naming conventions
-* Integration with automation pipelines
-* Expansion to DBRE practices
+* Script naming standardization
+* Advanced automation workflows
+* Expansion toward DBRE practices
 
 ---
 
