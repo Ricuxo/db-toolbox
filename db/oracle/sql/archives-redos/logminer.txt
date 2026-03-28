@@ -1,0 +1,3 @@
+https://oracle-base.com/articles/8i/logminer
+
+http://eduardolegatti.blogspot.com.br/2017/07/logminer-analisando-o-conteudo-de-um.html

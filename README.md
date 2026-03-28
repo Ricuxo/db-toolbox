@@ -4,60 +4,85 @@
 ![Type](https://img.shields.io/badge/type-dba--toolbox-blue)
 ![Maintained](https://img.shields.io/badge/maintained-yes-brightgreen)
 
-> Database scripts and automation toolbox for daily DBA operations.
+> Toolbox pessoal para administração de bancos de dados, automação e troubleshooting no dia a dia.
 
 ---
 
-## 🎯 Purpose
+## 🎯 Objetivo
 
-This repository centralizes scripts and tools used in day-to-day database administration and automation tasks.
+Centralizar scripts e automações utilizados no dia a dia como DBA, permitindo:
 
-It is designed to:
-
-* Organize scripts by database technology and domain
-* Facilitate reuse and versioning
-* Enable script transport across restricted environments
-* Keep automation simple and maintainable
+* Organização por tecnologia e domínio
+* Reutilização de scripts
+* Versionamento via Git
+* Facilidade de transporte entre ambientes restritos
 
 ---
 
-## 🧠 Repository Structure
+## 🧠 Estrutura do Repositório
 
 ```bash
 db-toolbox/
 │
-├── db/
-│   ├── oracle/
-│   │   ├── sql/
-│   │   │   ├── sessions/
-│   │   │   ├── tablespaces/
-│   │   │   ├── objects/
-│   │   │   ├── performance/
-│   │   │   ├── dataguard/
-│   │   │   ├── asm/
-│   │   │   ├── rman/
-│   │   │   ├── parameters/
-│   │   │   └── system/
-│   │   │
-│   │   └── scripts/
-│   │
-│   ├── mongo/
-│   │   └── scripts/
-│   │
-│   └── sql/
-│       ├── scripts/
-│       └── reports/
-│
-├── automation/
-│   └── shell/
-│       ├── oracle/
-│       └── mongo/
-│
 ├── ansible/
 │   └── projects/
 │       └── ansible-oracle/
-│           ├── playbooks/
-│           └── roles/
+│           └── playbook/
+│
+├── automation/
+│   └── shell-script/
+│       ├── oracle/
+│       └── mongo/
+│
+├── db/
+│   ├── oracle/
+│   │   ├── scripts/
+│   │   └── sql/
+│   │       ├── acl/
+│   │       ├── archives-redos/
+│   │       ├── asm/
+│   │       ├── audit/
+│   │       ├── awr/
+│   │       ├── blocks/
+│   │       ├── controlfile/
+│   │       ├── database/
+│   │       ├── datafiles/
+│   │       ├── dataguard/
+│   │       ├── datapump/
+│   │       ├── enterprise-manager/
+│   │       ├── environment/
+│   │       ├── exadata/
+│   │       ├── goldengate/
+│   │       ├── indexes/
+│   │       ├── initfile/
+│   │       ├── inventory/
+│   │       ├── jobs/
+│   │       ├── licensing/
+│   │       ├── locks/
+│   │       ├── memory/
+│   │       ├── miscellaneous/
+│   │       ├── objects/
+│   │       ├── profile/
+│   │       ├── rman/
+│   │       ├── sessions/
+│   │       ├── tables/
+│   │       ├── tablespace/
+│   │       ├── traces/
+│   │       ├── tunning/
+│   │       ├── undo/
+│   │       └── users/
+│   │
+│   ├── mongo/
+│   │   ├── js/
+│   │   └── scripts/
+│   │
+│   ├── postgresql/
+│   │   ├── scripts/
+│   │   └── sql/
+│   │
+│   └── sqlserver/
+│       ├── scripts/
+│       └── sql/
 │
 ├── templates/
 └── README.md
@@ -65,111 +90,136 @@ db-toolbox/
 
 ---
 
-## 📂 Directory Overview
+## 📂 Organização por Camadas
 
-### 🔹 db/
+### 🔹 `db/`
 
-Database-specific scripts organized by technology and domain.
+Scripts organizados por tecnologia de banco:
 
-#### Oracle
-
-* SQL scripts organized by domain:
-
-  * `sessions/`
-  * `tablespaces/`
-  * `objects/`
-  * `performance/`
-  * `dataguard/`
-  * `asm/`
-  * `rman/`
-  * `parameters/`
-  * `system/`
-* Shell scripts in `scripts/`
-
-#### Mongo
-
-* Administrative and diagnostic scripts in `scripts/`
-
-#### SQL
-
-* Generic SQL scripts and reports not tied to a specific database
+* **oracle/** → estrutura completa por domínio técnico (alta granularidade)
+* **mongo/** → scripts JS e operacionais
+* **postgresql/** → scripts SQL e automações
+* **sqlserver/** → scripts SQL e utilitários
 
 ---
 
-### 🔹 automation/
+### 🔹 `automation/`
 
-Executable scripts responsible for orchestration.
+Scripts de orquestração:
 
-* Shell scripts that call database scripts
-* Entry points for operational workflows
-
----
-
-### 🔹 ansible/
-
-Infrastructure automation.
-
-* `projects/`: isolated Ansible projects
-* Example: `ansible-oracle`
+* Shell scripts que executam validações e rotinas
+* Integração com scripts SQL/JS
 
 ---
 
-### 🔹 templates/
+### 🔹 `ansible/`
 
-Reusable templates for creating new scripts.
+Projetos de automação de infraestrutura:
+
+* Contém projetos independentes (ex: instalação Oracle)
+* Uso interno e laboratório
 
 ---
 
-## ⚙️ Usage Workflow
+### 🔹 `templates/`
+
+Modelos reutilizáveis para criação de novos scripts.
+
+---
+
+## 🧠 Padrão Oracle (decisão importante)
+
+A estrutura Oracle foi organizada por **domínio técnico detalhado**, permitindo alta especialização:
+
+Exemplos:
+
+* `sessions/` → sessões e locks
+* `tablespace/`, `datafiles/`, `asm/` → armazenamento
+* `dataguard/` → replicação
+* `rman/`, `datapump/` → backup e migração
+* `awr/`, `tunning/`, `memory/` → performance
+* `objects/`, `users/`, `profile/` → administração lógica
+
+> ⚠️ Estrutura intencionalmente granular para refletir operações reais de DBA.
+
+---
+
+## ⚡ Execução rápida com SQL*Plus
+
+Para uso no dia a dia, os scripts não são chamados diretamente pelo path completo.
+
+É utilizada uma pasta local fora do repositório:
+
+```bash
+~/sqlplus
+```
+
+Com configuração:
+
+```bash
+export SQLPATH=$HOME/sqlplus
+```
+
+E uso de symlinks:
+
+```bash
+ln -s <repo>/db/oracle/sql/tablespace/tablespace_usage.sql ~/sqlplus/tablespace.sql
+```
+
+Execução:
+
+```sql
+@tablespace
+@sessions
+@users
+```
+
+---
+
+## ⚙️ Workflow Git
 
 ```bash
 git pull
 git add .
-git commit -m "feat: add new script"
+git commit -m "feat: new script"
 git pull --rebase
 git push
 ```
 
 ---
 
-## 🧾 Best Practices
+## 🧾 Boas práticas
 
-* Keep scripts simple and focused
-* Organize SQL by domain (not by script type)
-* Avoid unnecessary abstraction
-* Prefer direct execution over complex dependencies
-* Separate orchestration (shell) from execution (SQL/JS)
-
----
-
-## 🔐 Security Guidelines
-
-* Do NOT store credentials or sensitive data
-* Use `.gitignore` to exclude local files
-* Sanitize scripts before sharing externally
+* Scripts pequenos e objetivos
+* Separação clara entre SQL e shell
+* Evitar duplicação
+* Nomeação simples e direta
+* Não over-engineering
 
 ---
 
-## ☁️ Synchronization Note
+## 🔐 Segurança
 
-This repository may be mirrored to cloud storage for file transfer purposes.
-
-> ⚠️ Avoid using synchronized folders as your primary development environment.
-
----
-
-## 🚀 Publishing Strategy
-
-This repository is intended for internal and personal usage.
-
-For public sharing:
-
-* Extract reusable components into separate repositories
-* Clean and document before publishing
-* Reference public repositories in blog posts
+* Não armazenar senhas ou dados sensíveis
+* Sanitizar scripts antes de compartilhar
+* Utilizar `.gitignore` quando necessário
 
 ---
 
-## 👤 Author
+## 🚀 Estratégia de publicação
+
+Este repositório é voltado para uso interno.
+
+Para compartilhar conteúdo:
+
+1. Desenvolver aqui
+2. Extrair versão limpa
+3. Criar novo repositório público
+4. Documentar
+5. Publicar
+
+---
+
+## 👤 Autor
 
 Henrique Soares da Silva

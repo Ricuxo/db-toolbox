@@ -1,0 +1,43 @@
+Como trabalhar com a package que cria backup das tabelas:
+
+
+set serveroutput on (utilizar para qualquer operação).
+
+Mostra todos os métodos:
+	DESC change_backup
+----------------
+SLAUSER.TB_FALHA 
+SLAUSER.TB_FALHA_PORTAL 
+SLAUSER.TB_MOTIVO_FALHA
+RC13007107
+--------
+Cria backup
+=================================================================================================================================================
+Criar backup para expirar em 1 dia
+	Exec Change_backup.BACKUP_TABLE (0212,'SLAUSER', 'TB_FALHA', TO_CHAR(SYSDATE+1));
+
+Criar backup para expirar em 7 dias
+	Exec Change_backup.BACKUP_TABLE (Nº DA CHANGE,'OWNER', 'TABLE NAME', TO_CHAR(SYSDATE+7));
+
+Criar backup para expirar em 1 mês
+Exec Change_backup.BACKUP_TABLE (8745,'PROGRESS', 'TABLE NAME', ADD_MONTHS(SYSDATE,1));
+
+=================================================================================================================================================
+Para dropar um backup existente:
+
+1º lista os backups
+	SET LINE 300
+	select change_backup.list_available from dual;
+	
+2º Dropa o backup da tabela que vc desejar
+	exec change_backup.drop_backup (13707,1);  --Para consultar o número da versão utilize o list_available.
+=================================================================================================================================================
+
+Listar o Metadata de alguma tabela que foi copiada:
+
+SET LONG 4000
+SET PAGESIZE 0
+SET HEA OFF
+select change_backup.show_METADATA(Nº DA CHANGE,Nº DA VERSÃO) from dual; --
+Para consultar o número da versão utilize o list_available.
+

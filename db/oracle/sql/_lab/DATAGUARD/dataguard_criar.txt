@@ -1,0 +1,58 @@
+######################################################################
+###
+###
+###		DATAGUARD 12C
+###
+###
+######################################################################
+
+
+
+###
+### PRIMARIO
+######################################################################
+
+1 -  Enable Forced Logging
+
+	SQL> ALTER DATABASE FORCE LOGGING;
+	
+	
+2 - Configure Redo Transport Authentication
+
+	ALTER SYSTEM SET LOG_ARCHIVE_DEST_1/2
+
+3 - Configure the Primary Database to Receive Redo Data
+
+	3.1 - Verificar tamanho do redo e quantas threads:
+	
+	select THREAD#,GROUP#,BYTES/1024/1024 bytes from v$log;
+
+	3.2 - Criar um group extra de standby logfile, para cada thread. Não é necessario criar com mais de 1 membro.
+	
+	
+	SQL> ALTER DATABASE ADD STANDBY LOGFILE ('/oracle/dbs/slog1.rdo') SIZE 500M;
+	SQL> ALTER DATABASE ADD STANDBY LOGFILE ('/oracle/dbs/slog2.rdo') SIZE 500M;
+	SQL> ALTER DATABASE ADD STANDBY LOGFILE ('/oracle/dbs/slog3.rdo') SIZE 500M;	
+
+4 - Set Primary Database Initialization Parameters
+
+DB_NAME=xxxxx
+DB_UNIQUE_NAME=xxxxx
+LOG_ARCHIVE_CONFIG='DG_CONFIG=(xxxxx,yyyyy)'
+CONTROL_FILES='/arch1/xxxxx/control1.ctl', '/arch2/xxxxx/control2.ctl'
+LOG_ARCHIVE_DEST_1= 'LOCATION=USE_DB_RECOVERY_FILE_DEST   VALID_FOR=(ALL_LOGFILES,ALL_ROLES)  DB_UNIQUE_NAME=xxxxx'
+LOG_ARCHIVE_DEST_2= 'SERVICE=yyyyy ASYNC  VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE)   DB_UNIQUE_NAME=yyyyy'
+REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE
+LOG_ARCHIVE_FORMAT=%t_%s_%r.arc
+FAL_SERVER=xxxxx
+DB_FILE_NAME_CONVERT='/xxxxx/','/yyyyy/'
+LOG_FILE_NAME_CONVERT='/xxxxx/','/yyyyy/' 
+STANDBY_FILE_MANAGEMENT=AUTO
+
+
+5 - Enable Archiving
+
+SQL> SHUTDOWN IMMEDIATE;
+SQL> STARTUP MOUNT;
+SQL> ALTER DATABASE ARCHIVELOG;
+SQL> ALTER DATABASE OPEN;

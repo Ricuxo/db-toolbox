@@ -1,0 +1,431 @@
+
+Monitoring Smart Flash Cache Activity on Oracle Exadata
+
+By David Fitzjarrell
+
+Monitoring Smart Flash Cache on the database servers is very limited as only one metric is available from V$SYSSTAT that records flash cache activity -- "cell flash cache read hits". On the other hand monitoring the Smart Flash Cache from the storage servers provides more detail and diagnostic data, although there is no way to monitor the full storage tier from a single location, thus the statistics are for the portion of the total flash cache on the given storage server.
+
+Storage Server Tools
+
+Through the CellCLI utility a number of statistics are available to monitor flash cache usage. You can view the metrics and their descriptions using the LIST METRICDEFINITION command. To return the flash cache metrics and their descriptions the following command can be used:
+
+CellCLI> list metricdefinition attributes name, description where objectType = 'PHYSICALDISK'
+
+The metrics and descriptions are listed in Table 1:
+
+FC_BYKEEP_OVERWR                "Number of megabytes pushed out of the FlashCache because of space limit for 'keep' objects"
+FC_BYKEEP_OVERWR_SEC            "Number of megabytes per second pushed out of the FlashCache because of space limit for 'keep' objects"
+FC_BYKEEP_USED                  "Number of megabytes used for 'keep' objects on FlashCache"
+FC_BY_USED                      "Number of megabytes used on FlashCache"
+FC_IO_BYKEEP_R                  "Number of megabytes read from FlashCache for 'keep' objects"
+FC_IO_BYKEEP_R_SEC              "Number of megabytes read per second from FlashCache for 'keep' objects"
+FC_IO_BYKEEP_W                  "Number of megabytes written to FlashCache for 'keep' objects"
+FC_IO_BYKEEP_W_SEC              "Number of megabytes per second written to FlashCache for 'keep' objects"
+FC_IO_BY_R                      "Number of megabytes read from FlashCache"
+FC_IO_BY_R_MISS                 "Number of megabytes read from disks because not all requested data was in FlashCache"
+FC_IO_BY_R_MISS_SEC             "Number of megabytes read from disks per second because not all requested data was in FlashCache"
+FC_IO_BY_R_SEC                  "Number of megabytes read per second from FlashCache"
+FC_IO_BY_R_SKIP                 "Number of megabytes read from disks for IO requests that bypass FlashCache"
+FC_IO_BY_R_SKIP_SEC             "Number of megabytes read from disks per second for IO requests that bypass FlashCache"
+FC_IO_BY_W                      "Number of megabytes written to FlashCache"
+FC_IO_BY_W_SEC                  "Number of megabytes per second written to FlashCache"
+FC_IO_ERRS                      "Number of IO errors on FlashCache"
+FC_IO_RQKEEP_R                  "Number of read IO requests for 'keep' objects satisfied from FlashCache"
+FC_IO_RQKEEP_R_MISS             "Number of read IO requests for 'keep' objects which did not find all data in FlashCache"
+FC_IO_RQKEEP_R_MISS_SEC         "Number of read IO requests per second for 'keep' objects which did not find all data in FlashCache"
+FC_IO_RQKEEP_R_SEC              "Number of read IO requests for 'keep' objects per second satisfied from FlashCache"
+FC_IO_RQKEEP_R_SKIP             "Number of read IO requests for 'keep' objects that bypass FlashCache"
+FC_IO_RQKEEP_R_SKIP_SEC         "Number of read IO requests per second for 'keep' objects that bypass FlashCache"
+FC_IO_RQKEEP_W                  "Number of IO requests for 'keep' objects which resulted in FlashCache being populated with data"
+FC_IO_RQKEEP_W_SEC              "Number of IO requests per second for 'keep' objects which resulted in FlashCache being populated with data"
+FC_IO_RQ_R                      "Number of read IO requests satisfied from FlashCache"
+FC_IO_RQ_R_MISS                 "Number of read IO requests which did not find all data in FlashCache"
+FC_IO_RQ_R_MISS_SEC             "Number of read IO requests per second which did not find all data in FlashCache"
+FC_IO_RQ_R_SEC                  "Number of read IO requests satisfied per second from FlashCache"
+FC_IO_RQ_R_SKIP                 "Number of read IO requests that bypass FlashCache"
+FC_IO_RQ_R_SKIP_SEC             "Number of read IO requests per second that bypass FlashCache"
+FC_IO_RQ_W                      "Number of IO requests which resulted in FlashCache being populated with data"
+FC_IO_RQ_W_SEC                  "Number of IO requests per second which resulted in FlashCache being populated with data"
+
+             Table 1   Storage Cell Flash Cache Metrics and Their Descriptions
+
+Related Articles
+
+    An Exadata Primer
+    Exadata Survival Guide
+    Monitoring Exadata Storage Servers with the CellCLI
+    Monitoring Smart Flash Cache Activity on Oracle Exadata
+    Monitoring Smart Scans in Oracle Exadata
+
+These metrics are cumulative from the time cellsrv was started. To list the current value for one or more of the metrics the LIST METRICCURRENT statement is used. The output reports the cumulative statistics for a single storage cell; the same command will need to be run on all remaining storage cells to monitor the activity for the entire Smart Flash Cache.
+
+Using the LIST METRICCURRENT statement to return Smart Flash Cache metrics for the given storage cell:
+
+CellCLI> list metriccurrent where objectType = 'FLASHCACHE'
+
+   FC_BYKEEP_OVERWR                FLASHCACHE      0.000 MB
+   FC_BYKEEP_OVERWR_SEC            FLASHCACHE      0.000 MB/sec
+   FC_BYKEEP_USED                  FLASHCACHE      0.000 MB
+   FC_BY_USED                      FLASHCACHE      365,322 MB
+   FC_IO_BYKEEP_R                  FLASHCACHE      0.000 MB
+   FC_IO_BYKEEP_R_SEC              FLASHCACHE      0.000 MB/sec
+   FC_IO_BYKEEP_W                  FLASHCACHE      0.047 MB
+   FC_IO_BYKEEP_W_SEC              FLASHCACHE      0.000 MB/sec
+   FC_IO_BY_R                      FLASHCACHE      60,257,512 MB
+   FC_IO_BY_R_MISS                 FLASHCACHE      12,592,252 MB
+   FC_IO_BY_R_MISS_SEC             FLASHCACHE      0.891 MB/sec
+   FC_IO_BY_R_SEC                  FLASHCACHE      21.193 MB/sec
+   FC_IO_BY_R_SKIP                 FLASHCACHE      567,179,945 MB
+   FC_IO_BY_R_SKIP_SEC             FLASHCACHE      3.681 MB/sec
+   FC_IO_BY_W                      FLASHCACHE      22,170,046 MB
+   FC_IO_BY_W_SEC                  FLASHCACHE      4.028 MB/sec
+   FC_IO_ERRS                      FLASHCACHE      0
+   FC_IO_RQKEEP_R                  FLASHCACHE      0 IO requests
+   FC_IO_RQKEEP_R_MISS             FLASHCACHE      0 IO requests
+   FC_IO_RQKEEP_R_MISS_SEC         FLASHCACHE      0.0 IO/sec
+   FC_IO_RQKEEP_R_SEC              FLASHCACHE      0.0 IO/sec
+   FC_IO_RQKEEP_R_SKIP             FLASHCACHE      0 IO requests
+   FC_IO_RQKEEP_R_SKIP_SEC         FLASHCACHE      0.0 IO/sec
+   FC_IO_RQKEEP_W                  FLASHCACHE      3 IO requests
+   FC_IO_RQKEEP_W_SEC              FLASHCACHE      0.0 IO/sec
+   FC_IO_RQ_R                      FLASHCACHE      6,638,504,145 IO requests
+   FC_IO_RQ_R_MISS                 FLASHCACHE      373,704,323 IO requests
+   FC_IO_RQ_R_MISS_SEC             FLASHCACHE      28.5 IO/sec
+   FC_IO_RQ_R_SEC                  FLASHCACHE      2,688 IO/sec
+   FC_IO_RQ_R_SKIP                 FLASHCACHE      1,010,237,424 IO requests
+   FC_IO_RQ_R_SKIP_SEC             FLASHCACHE      16.7 IO/sec
+   FC_IO_RQ_W                      FLASHCACHE      1,096,872,236 IO requests
+   FC_IO_RQ_W_SEC                  FLASHCACHE      326 IO/sec
+
+Metrics for objects where the storage clause sets CELL_FLASH_CACHE to KEEP can be isolated and reported; for example:
+
+CellCLI> list metriccurrent where objectType = 'FLASHCACHE' and name like '.*KEEP.*'
+         FC_BYKEEP_OVERWR                FLASHCACHE      0.000 MB
+         FC_BYKEEP_OVERWR_SEC            FLASHCACHE      0.000 MB/sec
+         FC_BYKEEP_USED                  FLASHCACHE      0.000 MB
+         FC_IO_BYKEEP_R                  FLASHCACHE      0.000 MB
+         FC_IO_BYKEEP_R_SEC              FLASHCACHE      0.000 MB/sec
+         FC_IO_BYKEEP_W                  FLASHCACHE      0.047 MB
+         FC_IO_BYKEEP_W_SEC              FLASHCACHE      0.000 MB/sec
+         FC_IO_RQKEEP_R                  FLASHCACHE      0 IO requests
+         FC_IO_RQKEEP_R_MISS             FLASHCACHE      0 IO requests
+         FC_IO_RQKEEP_R_MISS_SEC         FLASHCACHE      0.0 IO/sec
+         FC_IO_RQKEEP_R_SEC              FLASHCACHE      0.0 IO/sec
+         FC_IO_RQKEEP_R_SKIP             FLASHCACHE      0 IO requests
+         FC_IO_RQKEEP_R_SKIP_SEC         FLASHCACHE      0.0 IO/sec
+         FC_IO_RQKEEP_W                  FLASHCACHE      3 IO requests
+         FC_IO_RQKEEP_W_SEC              FLASHCACHE      0.0 IO/sec
+
+CellCLI>
+
+It is also possible to exclude those same metrics by changing the statement slightly:
+
+CellCLI> list metriccurrent where objectType = 'FLASHCACHE' and name not like '.*KEEP.*'
+         FC_BY_USED              FLASHCACHE      365,290 MB
+         FC_IO_BY_R              FLASHCACHE      60,267,646 MB
+         FC_IO_BY_R_MISS         FLASHCACHE      12,592,880 MB
+         FC_IO_BY_R_MISS_SEC     FLASHCACHE      1.568 MB/sec
+         FC_IO_BY_R_SEC          FLASHCACHE      23.065 MB/sec
+         FC_IO_BY_R_SKIP         FLASHCACHE      567,186,500 MB
+         FC_IO_BY_R_SKIP_SEC     FLASHCACHE      5.888 MB/sec
+         FC_IO_BY_W              FLASHCACHE      22,171,791 MB
+         FC_IO_BY_W_SEC          FLASHCACHE      2.865 MB/sec
+         FC_IO_ERRS              FLASHCACHE      0
+         FC_IO_RQ_R              FLASHCACHE      6,639,787,345 IO requests
+         FC_IO_RQ_R_MISS         FLASHCACHE      373,724,226 IO requests
+         FC_IO_RQ_R_MISS_SEC     FLASHCACHE      50.2 IO/sec
+         FC_IO_RQ_R_SEC          FLASHCACHE      2,927 IO/sec
+         FC_IO_RQ_R_SKIP         FLASHCACHE      1,010,251,273 IO requests
+         FC_IO_RQ_R_SKIP_SEC     FLASHCACHE      19.4 IO/sec
+         FC_IO_RQ_W              FLASHCACHE      1,096,966,059 IO requests
+         FC_IO_RQ_W_SEC          FLASHCACHE      170 IO/sec
+
+CellCLI>
+
+Performance metrics aren't the only values collected for the Smart Flash Cache; you can see what is in the cache using the LIST FLASHCACHECONTENT command. To see which attributes are available to view or that can be used to filter the output, the FLASHCACHECONTENT object can be described:
+
+CellCLI> describe flashcachecontent
+        cachedKeepSize
+        cachedSize
+        dbID
+        dbUniqueName
+        hitCount
+        hoursToExpiration
+        missCount
+        objectNumber
+        tableSpaceNumber
+
+A specific database can be targeted using either dbUniqueName or dbID. The objectNumber and tableSpaceNumber attributes are specific to a given dbUniqueName/dbID so they should be used in conjunction with either dbUniqueName or dbID. To view the unique database name, the object number, the KEEP size, the cache size, the hit count and miss count for objects from the DBM database the command would be as follows:
+
+CellCLI> list flashcachecontent where dbUniqueName = 'DBM' and hitcount > 99 attributes dbUniqueName, objectNumber, cachedKeepSize, cachedSize, hitcount, misscount
+         DBM     2       0       172032          1889    350
+         DBM     8       0       81920           168     7
+         DBM     104     0       622592          170     48
+         DBM     225     0       2654208         382     247
+         DBM     227     0       1081344         173     77
+         DBM     268     0       1859584         770     25
+         DBM     271     0       65536           298     5
+         DBM     272     0       65536           383     4
+         DBM     421     0       2064384         8120    772
+         DBM     424     0       589824          2391    63
+         DBM     425     0       122880          372     17
+         DBM     466     0       196608          612     37
+         DBM     469     0       131072          462     4
+         DBM     474     0       1114112         4130    193
+         DBM     476     0       3194880         730     734
+         DBM     477     0       10780672        17240   9525
+         DBM     478     0       2482176         327     956
+         DBM     5823    0       229376          107     4
+         DBM     5830    0       819200          295     147
+         DBM     5831    0       4268032         8869    1366
+         DBM     5847    0       319488          382     42
+         DBM     5849    0       262144          105     16
+         DBM     5853    0       90112           160     21
+         DBM     5857    0       843776          246     129
+         DBM     5886    0       1966080         2568    1640
+         DBM     5888    0       688128          152     187
+         DBM     5907    0       245760          147     8
+         DBM     5908    0       163840          597     56
+         DBM     5910    0       393216          1079    56
+         DBM     5911    0       98304           238     44
+         DBM     5912    0       983040          1367    1122
+         DBM     6173    0       98304           142     13
+         DBM     6175    0       131072          190     10
+         DBM     6176    0       65536           145     26
+         DBM     6304    0       65536           165     2
+         DBM     6305    0       65536           254     13
+         DBM     6312    0       262144          772     33
+         DBM     6313    0       196608          739     23
+         DBM     6316    0       196608          614     17
+         DBM     6317    0       172032          743     38
+         DBM     6331    0       262144          533     16
+         DBM     6335    0       65536           302     4
+         DBM     6337    0       131072          500     3
+         DBM     6339    0       458752          993     94
+         DBM     6343    0       196608          573     7
+         DBM     6345    0       131072          418     4
+         DBM     6357    0       1245184         3988    468
+         DBM     6358    0       131072          362     34
+         DBM     6365    0       188416          260     34
+         DBM     6366    0       262144          500     55
+         DBM     6397    0       262144          867     51
+         DBM     6398    0       1474560         4901    688
+         DBM     6399    0       458752          1182    83
+         DBM     6400    0       262144          845     47
+         DBM     6415    0       131072          533     3
+         DBM     6423    0       196608          607     18
+         DBM     6424    0       262144          1105    30
+         DBM     6425    0       131072          447     4
+         DBM     6426    0       131072          490     23
+         DBM     6427    0       196608          724     6
+         DBM     6428    0       65536           273     4
+         DBM     6429    0       458752          1290    116
+         DBM     6430    0       65536           235     8
+         DBM     6433    0       196608          592     17
+         DBM     6435    0       262144          843     21
+         DBM     6436    0       196608          757     32
+         DBM     6437    0       131072          522     5
+         DBM     6443    0       163840          625     11
+         DBM     6445    0       131072          441     7
+         DBM     6447    0       131072          475     3
+         DBM     6494    0       65536           126     11
+         DBM     6503    0       65536           234     2
+         DBM     6506    0       3129344         7564    1976
+         DBM     6507    0       11337728        26885   6736
+         DBM     6508    0       3096576         8290    1615
+         DBM     6509    0       1310720         4752    397
+         DBM     6515    0       393216          930     114
+         DBM     6522    0       131072          475     3
+         DBM     6524    0       131072          474     3
+         DBM     6544    0       262144          883     12
+         DBM     6546    0       131072          331     6
+         DBM     6549    0       131072          399     7
+         DBM     6585    0       2220032         5603    1695
+         DBM     6586    0       1310720         4282    526
+         DBM     6588    0       114688          457     14
+         DBM     6589    0       131072          423     4
+         DBM     6591    0       262144          785     25
+         DBM     6592    0       131072          398     19
+         DBM     6593    0       131072          498     4
+         DBM     6594    0       131072          541     10
+         DBM     6595    0       131072          318     25
+         DBM     6605    0       65536           161     1
+         DBM     6607    0       131072          483     3
+         DBM     6656    0       1794048         165     55
+         DBM     12718   0       262144          340     33
+         DBM     12728   0       98304           234     14
+         DBM     12730   0       1196032         1919    520
+         DBM     12736   0       327680          614     36
+         DBM     18752   0       65536           166     1
+         DBM     20411   0       1900544         3824    675
+         DBM     23052   0       319488          77860   4
+         DBM     23053   0       1695744         259114  19595
+         DBM     23055   0       131072          37872   26
+         DBM     23056   0       49152           43335   5
+         DBM     23057   0       114688          43392   12
+         DBM     47869   0       262144          138     15
+         DBM     48001   0       360448          169     23
+         DBM     48125   0       360448          154     14
+         DBM     48185   0       622592          180     257
+         DBM     48264   0       286720          103     62
+         DBM     48306   0       32768           242     120
+         DBM     48406   0       196608          102     12
+         DBM     48464   0       237568          116     110
+         DBM     48466   0       1220608         247     104
+         DBM     48663   0       802816          142     52
+         DBM     48705   0       917504          101     20
+         DBM     48840   0       2334720         170     31
+         DBM     48972   0       2138112         176     104
+         DBM     4294967294      0       376832          25674712        181405
+
+CellCLI>
+
+By default the LIST FLASHCACHECONTENT command reports the dbID, tableSpaceNumber and objectNumber. To return other attributes they need to be listed in the command, using the attributes clause, as was done in this example.
+
+Notice that among all of the attributes available at the storage cell level the object name is not one of them. This can easily be reported from the database servers by querying DBA_OBJECTS using the objectNumber reported by CellCLI, which maps to the DATA_OBJECT_ID column:
+
+SQL> select owner,  object_type, object_name
+  2  from dba_objects
+  3  where data_object_id = 5888;
+
+OWNER                OBJECT_TYPE         OBJECT_NAME
+-------------------- ------------------- --------------------------------
+SYS                  INDEX               WRI$_ADV_MSG_GRPS_IDX_01
+
+SQL>
+
+A script can be written to generate the output from the LIST FLASHCACHECONTENT command and place it into a text file on the database server, for example:
+
+/usr/bin/ssh celladmin@myexa1cel01-priv.7-11.com  "CellCLI -e list flashcachecontent where dbUniqueName = '$1' attributes dbUniquename,objectNumber,hitcount,misscount,cachedSize"
+/usr/bin/ssh celladmin@myexa1cel02-priv.7-11.com  "CellCLI -e list flashcachecontent where dbUniqueName = '$1' attributes dbUniquename,objectNumber,hitcount,misscount,cachedSize"
+/usr/bin/ssh celladmin@myexa1cel03-priv.7-11.com  "CellCLI -e list flashcachecontent where dbUniqueName = '$1' attributes dbUniquename,objectNumber,hitcount,misscount,cachedSize"
+
+A second script would be used to execute the first script and send the output to a file:
+
+/home/oracle/bin/CellCLI_flashcache_mon_nohdrs.sh $1 > /home/oracle/ext_tbls/flash_mon.txt
+
+The database name of interest is passed to the second script on the command line. The generated file can then be used to create an external table, which can be joined to the DBA_OBJECTS view to report Smart Flash Cache activity by object name. As an example:
+
+SQL> create or replace directory admin_dat_dir as '/home/oracle/ext_tbls';
+
+Directory created.
+
+SQL> create or replace directory admin_log_dir as '/home/oracle/logs';
+
+Directory created.
+
+SQL> create or replace directory admin_bad_dir as '/home/oracle/bad';
+
+Directory created.
+
+SQL>
+SQL> CREATE TABLE flashmon_ext
+  2                     (db_name     varchar2(12),
+  3                      object_id   number,
+  4                      hitct       number,
+  5                      missct      number,
+  6                      cachesz     number
+  7                     )
+  8       ORGANIZATION EXTERNAL
+  9       (
+ 10         TYPE ORACLE_LOADER
+ 11         DEFAULT DIRECTORY admin_dat_dir
+ 12         ACCESS PARAMETERS
+ 13         (
+ 14           records delimited by newline
+ 15           badfile admin_bad_dir:'flashmon_ext%a_%p.bad'
+ 16           logfile admin_log_dir:'flashmon_ext%a_%p.log'
+ 17           fields terminated by whitespace
+ 18           missing field values are null
+ 19           ( db_name, object_id, hitct, missct, cachesz
+ 20           )
+ 21         )
+ 22         LOCATION ('flash_mon.txt')
+ 23       )
+ 24       PARALLEL
+ 25       REJECT LIMIT UNLIMITED;
+
+Table created.
+
+SQL>
+
+The first directory contains the text file generated from CellCLI and the LIST FLASHCACHECONTENT command. The next two directories are for the logfile and badfile which could be generated by SQL*Loader. Finally we create the external table; since the text file shouldn't change names or locations generating a new file won't cause the external table to become invalid. Thus the data can be refreshed at any time and the external table will still be usable.
+
+After the external table is created it's a simple task of writing the query to map object_name to object_id:
+
+SQL> select f.db_name, o.object_name, f.hitct, f.missct, f.cachesz
+  2  from flashmon_ext f left outer join dba_objects o on (o.data_object_id = f.object_id);
+
+DB_NAME      OBJECT_NAME                              HITCT     MISSCT    CACHESZ
+------------ ----------------------------------- ---------- ---------- ----------
+DBM1         ICOL$                                   407479       9163   40828928
+DBM1         ICOL$                                   425912      11731   59179008
+DBM1         ICOL$                                   575450      44509   31588352
+DBM1         I_USER1                                     33          4      32768
+DBM1         CON$                                       159         60      32768
+DBM1         CON$                                       447         67      98304
+DBM1         UNDO$                                       49          2      32768
+DBM1         C_COBJ#                                   4782        572    2129920
+DBM1         C_COBJ#                                   9077        984    3178496
+DBM1         C_COBJ#                                   8120        968    4358144
+DBM1         I_OBJ#                                    2320         65     557056
+DBM1         I_OBJ#                                    1323         17     327680
+DBM1         I_OBJ#                                    1742         30     327680
+DBM1         I_IND1                                     280         19     458752
+DBM1         I_IND1                                    1160         44     196608
+DBM1         I_IND1                                    1405         35     131072
+DBM1         I_CDEF2                                   6150        516     425984
+DBM1         I_CDEF2                                   1332         78     720896
+DBM1         I_CDEF2                                   3483        210    2031616
+DBM1         I_OBJ5                                   49088       2555    9732096
+DBM1         I_OBJ5                                   16742       1144    8192000
+.....
+
+In this example the flashmon_ext table contains 16,202 rows since data was collected across all three available storage cells. This explains the apparent duplication of object names in the output; each storage cell can cache the same object at the same time. Even though the object names may be duplicated, the cache size, hit count, and miss count are usually different.
+
+It is not unusual to find object_id values in the four billion range, and these object_ids won't match to any object in DBA_OBJECTS. One source of object_ids in that range would be the V$FIXED_TABLE and GV$FIXED_TABLE views, however none of the listed object_id values in the flashmon_ext table in that range match any of those objects. In the absence of global temporary tables the objects in question are undo segments.
+Database Server Tools
+
+There isn't much to see at the database layer, unfortunately. A single statistic, "cell flash cache read hits", is all that is available. Like the other matrics this is cumulative, since the instance started as reported in V$SYSSTAT and for the duration of the current session in V$MYSTAT. The easiest way to measure the Smart Flash Cache activity for a SQL statement is to query V$MYSTAT before and after the statement is executed. Doing this in SQL*Plus offers the ability to save the query results in variables for use after the statement has completed, as follows:
+
+SQL> select statistic#, value
+  2  from v$mystat
+  3  where statistic# in (select statistic# from v$statname where name = 'cell flash cache read hits');
+
+STATISTIC#      VALUE
+---------- ----------
+       605          1
+
+SQL>
+SQL> select count(*)
+  2  from emp;
+
+  COUNT(*)
+----------
+   7340032
+
+SQL>
+SQL> column   val new_value endval
+SQL>
+SQL> select statistic#, value val
+  2  from v$mystat
+  3  where statistic# in (select statistic# from v$statname where name = 'cell flash cache read hits');
+
+STATISTIC#        VAL
+---------- ----------
+       605        857
+
+SQL>
+SQL>
+SQL> select &endval - &beginval flash_hits
+  2  from dual;
+
+FLASH_HITS
+----------
+       856
+
+SQL>
+
+With a bit of effort and preparation on the DBA's part,
+ monitoring the Smart Flash Cache can be fairly easy. If the time is taken to also establish user equivalence between 
+ nodes and storage cells, the process can be automated via cron to provide hourly updates to measure performance of the Smart Flash Cache. It's a performance enhancement with Exadata you really want to have working at its peak, and the methods described here can help you do just that.

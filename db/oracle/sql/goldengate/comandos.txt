@@ -1,0 +1,21 @@
+===REPORTS===
+send <nome>, report
+view report <nome> = Detalhes do processo.
+stats <nome> = Total de transações que está ocorrendo
+
+
+
+===SENHAS===
+
+--Criptografar a senha
+ENCRYPT PASSWORD GGADMIN ENCRYPTKEY DEFAULT
+
+Depois de criptografada utilizar:
+USERID ggadmin@PDB1, PASSWORD AACAAAAAAAAAAAHAKCUIXDBIVBKDBCGJ BLOWFISH, ENCRYPTKEY DEFAULT
+
+
+===VERIFICAR SE PROCESSOS ESTÁ EXECUTANDO===
+
+select inst_id, BLOCKING_SESSION_STATUS, sql_hash_value, PREV_HASH_VALUE, state, event, saddr, sid,serial#, username,command, 
+status,server,schemaname, process, machine, port,program, sql_id, sql_exec_start,prev_sql_id from gv$session where 
+module like '%SBELPOS2%' or module like '%SBELPRE2%'; 

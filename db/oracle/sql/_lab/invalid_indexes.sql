@@ -1,0 +1,7 @@
+SELECT owner, index_name, table_owner, table_name, INDEX_TYPE, TABLESPACE_NAME, PARTITIONED, status
+FROM DBA_INDEXES
+WHERE STATUS = 'UNUSABLE'
+  AND OWNER like '%&1%'
+/
+
+UNDEFINE 1

@@ -1,0 +1,6 @@
+select 'kill -9 ' || spid, program from v$process
+    where program!= 'PSEUDO'
+    and addr not in (select paddr from v$session)
+    and addr not in (select paddr from v$bgprocess)
+    and addr not in (select paddr from v$shared_server)
+/

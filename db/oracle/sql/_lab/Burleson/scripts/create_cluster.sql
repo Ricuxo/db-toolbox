@@ -1,0 +1,32 @@
+/*  */
+REM Replace the <> placeholders with the proper values
+REM for cluster name and cluster column as required.
+
+CREATE CLUSTER <cluster_name> (<cluster_column> NUMBER(2))
+PCTUSED 80
+PCTFREE 5
+SIZE 600
+TABLESPACE users
+STORAGE(
+INITIAL 200k
+NEXT 300K
+MINEXTENTS 2
+MAXEXTENTS 20
+PCTINCREASE 0);
+
+CREATE TABLE dept(
+DEPTNO NUMBER(2) CONSTRAINT PK_DEPT PRIMARY KEY,
+DNAME  VARCHAR2(14),
+LOC    VARCHAR2(13))
+CLUSTER <cluster_name) (<cluster_column>);
+
+CREATE TABLE emp(
+EMPNO NUMBER(4) CONSTRAINT PK_EMP PRIMARY KEY, 
+ENAME VARCHAR2(10) NOT NULL,
+JOB VARCHAR2(9),
+MGR NUMBER(4),
+HIREDATE DATE,
+SAL NUMBER(7,2),
+COMM NUMBER(7,2),
+DEPTNO NUMBER(2) REFERENCES dept)
+CLUSTER emp_dept (<cluster_column>);

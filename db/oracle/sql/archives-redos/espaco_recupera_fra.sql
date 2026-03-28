@@ -1,0 +1,1 @@
+Select file_type, percent_space_used as used,percent_space_reclaimable as reclaimable, number_of_files as "number" from v$flash_recovery_area_usage; 

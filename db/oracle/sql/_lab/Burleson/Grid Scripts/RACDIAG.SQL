@@ -1,0 +1,1 @@
+﻿See metalink.oracle.com for RACDIAG.SQL

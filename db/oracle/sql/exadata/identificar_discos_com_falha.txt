@@ -1,0 +1,9 @@
+Para listar os erros dos discos identificados como falha.
+
+CellCLI> LIST PHYSICALDISK WHERE diskType=HardDisk AND status=critical DETAIL
+CellCLI> list cell attributes cellsrvStatus,msStatus,rsStatus detail
+
+######## Raramente é para acontecer, porém, se acontecer, segue:
+Em caso de falha na adicao de disco, podemos utilizar o Isscsi da seguinte forma:
+
+/opt/MegaRAID/MegaCli/MegaCli64 -PDList -a0

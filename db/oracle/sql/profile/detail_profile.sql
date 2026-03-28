@@ -1,0 +1,5 @@
+set lines 600
+col limit for a30
+SELECT RESOURCE_NAME, LIMIT
+FROM DBA_PROFILES
+WHERE PROFILE = '&profile';

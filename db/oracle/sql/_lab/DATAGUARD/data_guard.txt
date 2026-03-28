@@ -1,0 +1,191 @@
+recover standby database until cancel;
+recover standby database PARALLEL 10 until cancel;
+
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE DISCONNECT FROM SESSION;
+
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE PARALLEL 4 USING CURRENT LOGFILE DISCONNECT;
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE PARALLEL 4 USING CURRENT LOGFILE DISCONNECT FROM SESSION;
+SELECT MESSAGE FROM V$DATAgUARD_STATUS;
+
+==============
+ ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL;
+ ALTER DATABASE RECOVER MANAGED STANDBY DATABASE PARALLEL 25 USING CURRENT LOGFILE DISCONNECT;
+
+ ALTER DATABASE RECOVER MANAGED STANDBY DATABASE  PARALLEL 3 THROUGH ALL SWITCHOVER DISCONNECT  USING CURRENT LOGFILE
+ ALTER DATABASE RECOVER MANAGED STANDBY DATABASE PARALLEL 20  THROUGH ALL SWITCHOVER DISCONNECT  USING CURRENT LOGFILE;
+ 
+ALTER DATABASE START LOGICAL STANDBY PARALLEL 10 APPLY IMMEDIATE;
+ALTER DATABASE START LOGICAL STANDBY APPLY IMMEDIATE;
+
+
+ALTER DATABASE ABORT LOGICAL STANDBY APPLY;
+
+PARALLEL
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE PARALLEL 4 DISCONNECT FROM SESSION;
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE PARALLEL N DISCONNECT; 11g
+
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL
+/
+
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE PARALLEL 20 DISCONNECT FROM SESSION
+/
+
+select * from V$SYSMETRIC_SUMMARY 
+/
+alter system set log_archive_dest_state_2=defer scope=both sid='*'; 
+
+alter system set log_archive_dest_state_2=enable scope=both sid='*'; ; 
+
+show parameter log_archive_dest_state_3
+
+SELECT THREAD#, SEQUENCE#, APPLIED FROM V$ARCHIVED_LOG order by 2,1;
+
+col COMPLETED for a17
+
+SELECT THREAD#, SEQUENCE#, APPLIED,TO_CHAR(completion_time, 'RRRR/MM/DD HH24:MI') AS completed FROM V$ARCHIVED_LOG
+where THREAD#= &3
+--AND ROWNUM >= 10
+AND DEST_ID=2
+order by 2 ASC
+	/
+	set lines 160
+	col NAME for a14
+	col value for a15
+	SELECT name, value, datum_time, time_computed FROM V$DATAGUARD_STATS  WHERE name like 'apply lag';
+SELECT * FROM V$STANDBY_EVENT_HISTOGRAM WHERE NAME = 'apply lag' AND COUNT > 0;
+
+
+SELECT PROTECTION_MODE, PROTECTION_LEVEL, DATABASE_ROLE ROLE, SWITCHOVER_STATUS FROM V$DATABASE;
+SELECT FS_FAILOVER_STATUS "FSFO STATUS",  FS_FAILOVER_CURRENT_TARGET TARGET,  FS_FAILOVER_THRESHOLD THRESHOLD,  FS_FAILOVER_OBSERVER_PRESENT "OBSERVER PRESENT"  FROM V$DATABASE
+
+
+SELECT DEST_ID, APPLIED_SCN FROM V$ARCHIVE_DEST WHERE TARGET='STANDBY';
+
+SELECT THREAD#, SEQUENCE#, APPLIED FROM V$ARCHIVED_LOG
+where THREAD#=2 
+AND ROWNUM <= 10
+order by 2
+/
+
+SELECT THREAD#, SEQUENCE#, APPLIED FROM V$ARCHIVED_LOG
+where THREAD#=3 
+AND ROWNUM >= 10
+order by 2
+/
+
+
+set lines 160 pages 500
+col time for a20
+
+SELECT al.thrd "THREAD", almax "ULTIMA SEQ RECEBIDA", lhmax "ULTIMA SEQ APLICADA", (almax-lhmax) GAP FROM (select thread# thrd, MAX(sequence#) almax FROM v$archived_log WHERE resetlogs_change#=(SELECT resetlogs_change# FROM v$database) GROUP BY thread#) al, (SELECT thread# thrd, MAX(sequence#) lhmax FROM v$log_history WHERE resetlogs_change#=(SELECT resetlogs_change# FROM v$database) GROUP BY thread#) lh WHERE al.thrd = lh.thrd;
+select to_char(sysdate,'DD.MM.RR HH24:MI: SS') time, a.thread#, (select max (sequence#) from v$archived_log where archived='YES' and thread#=a.thread#) archived, max (a.sequence#) applied, (select max (sequence#) from v$archived_log where archived='YES' and thread#=a.thread#)-max (a.sequence#) gap from  v$archived_log a where a.applied='YES' group by a.thread#;
+
+select inst_id,process,pid,status,thread#,sequence#, block# from gv$managed_standby where process like 'MRP%';
+ 
+ select * from V$STANDBY_EVENT_HISTOGRAM
+ 
+ SELECT * FROM V$RECOVERY_PROGRESS;
+
+
+ GAPS
+SELECT MAX(R.SEQUENCE#) LAST_SEQ_RECD, MAX(L.SEQUENCE#) LAST_SEQ_SENT FROM
+ V$ARCHIVED_LOG R, V$LOG L WHERE
+ R.DEST_ID=2 AND L.ARCHIVED='YES';
+ 
+ SELECT NAME FROM V$ARCHIVED_LOG WHERE THREAD#=1 AND DEST_ID=1 AND
+  SEQUENCE# BETWEEN &1 AND &2;
+  
+SELECT * FROM (
+SELECT threadsequence#, archived, applied,
+TO_CHAR(completion_time, 'RRRR/MM/DD HH24:MI') AS completed
+FROM sys.v$archived_log
+ORDER BY sequence# DESC)
+wHERE ROWNUM <= 100
+/
+SELECT THREAD#, SEQUENCE#, APPLIED FROM V$ARCHIVED_LOG 
+wHERE ROWNUM = 10
+ORDER BY sequence# asc;
+order by 2;
+
+
+ALTER SYSTEM SWITCH ALL LOGFILE;
+
+select current_scn from v$database
+
+select STATUS, GAP_STATUS from GV$ARCHIVE_DEST_STATUS where DEST_ID = 2;
+
+
+
+
+startup nomount
+alter database mount standby database;
+
+
+-- BD PRIMARIO 
+select thread#, max(sequence#) from gv$archived_log group by thread# order by thread#;  
+
+-- BD STANDBY  
+SELECT THREAD#,MAX(SEQUENCE#),APPLIED FROM GV$ARCHIVED_LOG  group by thread#,APPLIED ORDER BY THREAD#; 
+
+SELECT THREAD#,SEQUENCE#,APPLIED
+FROM GV$ARCHIVED_LOG 
+ORDER BY THREAD#; 
+set pages 500 feed on veri on lines 500
+
+set lines 160
+col MESSAGE for a100
+col TIMESTAMP for a20
+select message, 	TO_CHAR(TIMESTAMP, 'DD-MM-RRRR HH24:MI:SS') "TIMESTAMP" from v$dataguard_status;
+
+ select snapshot_time, thread#, sequence#, applied_scn, applied_time, apply_rate from V$standby_apply_snapshot;
+
+ALTER SYSTEM SET log_archive_dest_2='' SCOPE=BOTH SID='*';
+Mon
+Creating standby redo logs
+On the standby database, standby redo logs can be created (if lgwr transmission is to be used).
+
+alter database add standby logfile '/some/path/file_1.log' size 1M, '/some/path/file_2.log' size 1M, '/some/path/file_3.log' size 1M;
+
+
+alter database recover managed standby database disconnect from session;
+
+ALTER SYSTEM SET log_archive_max_processes=8 scope=both sid='*';
+
+alter database mount standby database
+
+select TYPE, ITEM, SOFAR, TO_CHAR(SYSDATE, '=DD-MON-YYYY 
+HH:MI:SS') TIME from v$RECOVERY_PROGRESS where ITEM='Redo 
+Blocks' and TOTAL=0; 
+
+select PROCESS, SEQUENCE#, THREAD#, BLOCK#, BLOCKS, 
+TO_CHAR(SYSDATE, 'DD-MON-YYYY HH:MI:SS') TIME from 
+V$MANAGED_STANDBY where PROCESS='MRP0';
+
+sELECT DEST_ID,DESTINATION, STATUS, ARCHIVED_THREAD#, ARCHIVED_SEQ#
+ FROM V$ARCHIVE_DEST_STATUS
+ WHERE STATUS <> 'DEFERRED' AND STATUS <> 'INACTIVE'
+ 
+ SELECT FREQUENCY, DURATION FROM
+V$REDO_DEST_RESP_HISTOGRAM WHERE DEST_ID=6 AND FREQUENCY>1;
+
+SELECT max(DURATION) FROM V$REDO_DEST_RESP_HISTOGRAM
+WHERE DEST_ID=6 AND FREQUENCY>1;
+
+
+select 'Last Applied  : ' Logs, to_char(next_time,'DD-MON-YY:HH24:MI:SS') Time
+  from v$archived_log
+   where sequence# = (select max(sequence#) from v$archived_log where applied='YES')
+  union
+   select 'Last Received : ' Logs, to_char(next_time,'DD-MON-YY:HH24:MI:SS') Time
+  from v$archived_log
+   where sequence# = (select max(sequence#) from v$archived_log);
+
+   
+SELECT GROUP#,THREAD#,SEQUENCE#,ARCHIVED,STATUS FROM V$STANDBY_LOG order by 2;
+
+
+
+ALTER DATABASE ADD STANDBY LOGFILE THREAD 1  GROUP 61 ('+DATAC1/siebelp2/onlinelog/redo_stdby61a.rdo','+RECOC1/siebelp2/onlinelog/redo_stdby61b.rdo') SIZE 4096m;
+ALTER DATABASE ADD STANDBY LOGFILE THREAD 2  GROUP 62 ('+DATAC1/siebelp2/onlinelog/redo_stdby62a.rdo','+RECOC1/siebelp2/onlinelog/redo_stdby62b.rdo') SIZE 4096m;
+ALTER DATABASE ADD STANDBY LOGFILE THREAD 3  GROUP 63 ('+DATAC1/siebelp2/onlinelog/redo_stdby63a.rdo','+RECOC1/siebelp2/onlinelog/redo_stdby63b.rdo') SIZE 4096m;
+ALTER DATABASE ADD STANDBY LOGFILE THREAD 4  GROUP 64 ('+DATAC1/siebelp2/onlinelog/redo_stdby64a.rdo','+RECOC1/siebelp2/onlinelog/redo_stdby64b.rdo') SIZE 4096m;

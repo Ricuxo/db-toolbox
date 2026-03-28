@@ -1,0 +1,207 @@
+## COMANDO PARA PARAR O RECOVERY MANAGER DO DATAGUARD
+######################################################################################################
+1 - Acessar o banco de dados Standby
+2 - Executar o comando: 
+	ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL;
+
+	 	----12c
+	ALTER DATABASE RECOVER MANAGED STANDBY DATABASE DISCONNECT NODELAY;
+
+## verificar se existe LAG no dataguard
+######################################################################################################
+1 - Acessar o banco de dados Standby
+2 - Executar a query: 
+	col NAME for a14
+	col value for a15
+	SELECT name, value, datum_time, time_computed FROM V$DATAGUARD_STATS  WHERE name like 'apply lag';
+
+	
+	EXEMPLO:
+	--------------------------------------------------------------------------------------------
+	NAME           VALUE           DATUM_TIME                     TIME_COMPUTED
+	-------------- --------------- ------------------------------ ------------------------------
+	apply lag      +00 01:12:47    04/28/2015 16:37:40            04/28/2015 16:37:42
+
+17080320
+	
+	A coluna "VALUE" indica a quantidade de tempo que esta atrasado.
+	
+	
+## verificar qual o archive que esta sendo aplicado no banco de dados Standby
+########################################################################################################
+1 - Acessar o banco de dados Standby (Executar varias vezes para ver os blocos sendo alterados e a sequence)
+2 - Executar a query: 
+	select PROCESS, SEQUENCE#, THREAD#, BLOCK#, BLOCKS, TO_CHAR(SYSDATE, 'DD-MON-YYYY HH:MI:SS') TIME from V$MANAGED_STANDBY where 	PROCESS='MRP0';
+	
+	EXEMPLO DE OUTPUT
+	--------------------------------------------------------------------------
+	PROCESS    SEQUENCE#    THREAD#     BLOCK#     BLOCKS TIME
+	--------- ---------- ---------- ---------- ---------- --------------------
+	MRP0            1012          2     264008     628188 28-APR-2015 04:37:38
+
+	Se não retornar valores, é necessario verificar se o dataguard esta recebendo os archives ou se o standby nao esta em modo de recovery
+
+	----11g
+	ALTER DATABASE RECOVER MANAGED STANDBY DATABASE USING CURRENT LOGFILE DISCONNECT FROM SESSION;
+	ALTER DATABASE RECOVER MANAGED STANDBY DATABASE  THROUGH ALL SWITCHOVER DISCONNECT  USING CURRENT LOGFILE;
+	ALTER DATABASE RECOVER MANAGED STANDBY DATABASE PARALLEL 4 DISCONNECT FROM SESSION;
+	
+	----12c
+	ALTER DATABASE RECOVER MANAGED STANDBY DATABASE DISCONNECT NODELAY;
+
+
+	ALTER DATABASE [Database_name] SET ENABLE_BROKER;
+
+RECOVER STANDBY DATABASE FROM SERVICE mdprbr01vm;
+
+ALTER DATABASE DROP STANDBY LOGFILE GROUP	
+
+478566-478575
+
+RESTORE ARCHIVELOG FROM LOGSEQ=33151 UNTIL LOGSEQ=34728 THREAD 1;
+
+rman target sys/esperanca_2015@//rtprbr70_db:1941/rtprbr70 as sysdba
+
+list backup of archivelog from logseq 239900 until logseq 239987 thread 1;
+
+239987-240083
+	
+## Verificar GAP
+########################################################################################################
+1 - Acessar o banco de dados Standby
+2 - Executar a query: 
+SELECT al.thrd "THREAD", almax "ULTIMA SEQ RECEBIDA", lhmax "ULTIMA SEQ APLICADA", (almax-lhmax) GAP
+FROM (select thread# thrd, MAX(sequence#) almax FROM v$archived_log WHERE resetlogs_change#=(SELECT resetlogs_change# FROM v$database) GROUP BY thread#) al, (SELECT thread# thrd, MAX(sequence#) lhmax FROM v$log_history WHERE resetlogs_change#=(SELECT resetlogs_change# FROM v$database) GROUP BY thread#) lh WHERE al.thrd = lh.thrd;
+
+
+## VERIFICAR SE EXISTE ERROS DE COMUNICAÇÃO ENTRES O PRIMARIO E O STANDBY, ARCHIVES QUES ESTAO SENDO ENVIADOS OU RECEBIDOS, ARCHIVES APLICADOS
+## Quando executado no primario, ele mostra o archive que foi gerado, e a transferencia para o standby. Ele tambem mostra se existe erro de comunicação.
+## Quando executado no Standby, ele mostra o archive sendo recebido, aplicado no banco de dados, e possivel falha de comunicação com o primario.
+########################################################################################################
+1 - Acessar o banco de dados Primario ou Standby
+2 - Executar a query: 
+set lines 160
+col MESSAGE for a100
+col TIMESTAMP for a20
+select message, 	TO_CHAR(TIMESTAMP, 'DD-MM-RRRR HH24:MI:SS') "TIMESTAMP" from v$dataguard_status;
+
+
+select inst_id,dest_id,status,error from gv$archive_dest where dest_name='LOG_ARCHIVE_DEST_2';
+
+
+select dest_name, dest_id, error, status from v$archive_dest;
+
+
+Verificar necessidade de reinstate
+
+SQL> select  FS_FAILOVER_STATUS,FS_FAILOVER_OBSERVER_PRESENT   from v$database;
+ 
+FS_FAILOVER_STATUS     FS_FAIL
+---------------------- -------
+SYNCHRONIZED           YES
+
+
+---Verificar status do switchover
+
+select switchover_status from v$database;
+
+
+
+select max(sequence#) from gv$archived_log where applied='YES'
+
+
+
+delete archivelog until time 'SYSDATE-3';
+
+
+101372-101375
+RESTORE ARCHIVELOG FROM LOGSEQ=188047 UNTIL LOGSEQ=188095 THREAD 1;
+
+
+
+
+68891-68990
+
+
+
+SELECT DT,
+SUM(RB*8/3600000000*1.3) TOTAL_Mbps_REQ_FOR_A_DAY,
+MIN(RB*8/3600000000*1.3) MIN_Mbps_REQ_FOR_AN_HOUR,
+MAX(RB*8/3600000000*1.3) MAX_Mbps_REQ_FOR_AN_HOUR ,
+AVG(RB*8/3600000000*1.3) AVG_Mbps_REQ_FOR_AN_HOUR
+FROM
+(
+SELECT TRUNC (COMPLETION_TIME) DT,
+TO_CHAR (COMPLETION_TIME,'HH24') HH,
+SUM(BLOCKS*BLOCK_SIZE) RB
+FROM
+V$ARCHIVED_LOG
+WHERE COMPLETION_TIME > SYSDATE-5
+AND DEST_ID=1
+GROUP BY TRUNC(COMPLETION_TIME),
+TO_CHAR (COMPLETION_TIME, 'HH24')
+)
+GROUP BY DT;
+
+
+
+
+
+EDIT DATABASE 'SPCAPPRDSP2' SET STATE='APPLY-OFF';
+EDIT DATABASE 'SPCAPPRDSP2' SET STATE='APPLY-ON';
+
+
+
+
+
+alter database add standby logfile group 5 '+RECO' size 4294967296;
+alter database add standby logfile group 6 '+RECO' size 4294967296;
+alter database add standby logfile group 7 '+RECO' size 4294967296;
+alter database add standby logfile group 8 '+RECO' size 4294967296;
+alter database add standby logfile group 9 '+RECO' size 4294967296;
+
+
+
+rman target sys/esperanca_2015@//ceprbr85_db:1941/ceprbr85 as sysdba
+
+alter database clear logfile group  7; 
+alter database clear logfile group  8; 
+alter database clear logfile group  9; 
+alter database clear logfile group 10; 
+alter database clear logfile group 11; 
+alter database clear logfile group 12; 
+alter database clear logfile group 13; 
+
+[15:05] Daniel Luciano
+restore dos archives
+
+
+[15:05] Daniel Luciano
+assim, roda essa query no DR
+
+[15:05] Daniel Luciano
+SELECT PROCESS, STATUS, THREAD#, SEQUENCE#, BLOCK#, BLOCKS FROM V$MANAGED_STANDBY;
+
+[15:05] Daniel Luciano
+ve qual a sequence q ta parada no APPLY_LOG
+
+[15:05] Daniel Luciano
+vai na prod
+
+[15:05] Daniel Luciano
+archivelog list
+
+[15:05] Daniel Luciano
+ve a ultima sequence
+
+[15:05] Daniel Luciano
+restore dos archives
+
+[15:06] Daniel Luciano
+restore ARCHIVELOG FROM sequence 38714 until sequence 38755 thread=1;
+
+[15:06] Daniel Luciano
+stop start do DR
+
+[15:06] Daniel Luciano
+ja era

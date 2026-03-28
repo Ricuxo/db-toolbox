@@ -1,0 +1,13 @@
+To turn on, or to turn off, the Service LED on a disk you have to make use of the CellCLI. 
+For example we are in need of turning the Sevice LED on for 3 disks we will use the following command:
+
+CellCLI> alter physicaldisk  32:0,32:1,32:2 serviceled on
+
+To disable the Service LED we use the following command:
+
+CellCLI> alter physicaldisk  32:0,32:1,32:2 serviceled off
+
+
+
+
+alter physicaldisk  20:1 serviceled on

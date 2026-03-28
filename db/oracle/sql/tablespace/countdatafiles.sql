@@ -1,0 +1,6 @@
+-- Conta os datafiles de um determinado tablespace
+
+SELECT TABLESPACE_NAME, COUNT(1) DATAFILES
+FROM DBA_DATA_FILES
+WHERE TABLESPACE_NAME = UPPER('&tablespace')
+GROUP BY TABLESPACE_NAME;

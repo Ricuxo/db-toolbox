@@ -1,0 +1,143 @@
+
+[root@snelnxh22 ~]# df -h /u01
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/VGExaDb-LVDbOra1
+                       99G   83G   11G  89% /u01
+
+
+[root@snelnxh22 ~]# vgs
+  VG      #PV #LV #SN Attr   VSize VFree
+  VGExaDb   1   4   0 wz--n- 1.63T 1.45T
+
+
+[root@snelnxh22 ~]# lvs
+  LV        VG      Attr   LSize   Origin Snap%  Move Log Copy%  Convert
+  LVDbOra1  VGExaDb -wi-ao 100.00G
+  LVDbSwap1 VGExaDb -wi-ao  24.00G
+  LVDbSys1  VGExaDb -wi-ao  30.00G
+  LVDbSys2  VGExaDb -wi-a-  30.00G
+
+
+
+  
+
+[root@snelnxh21 ~]# lvextend -L +200G /dev/mapper/VGExaDb-LVDbOra1
+  Extending logical volume LVDbOra1 to 300.00 GB
+  Logical volume LVDbOra1 successfully resized
+
+  
+  
+
+
+[root@snelnxh21 ~]# resize2fs /dev/mapper/VGExaDb-LVDbOra1
+resize2fs 1.39 (29-May-2006)
+Filesystem at /dev/mapper/VGExaDb-LVDbOra1 is mounted on /u01; on-line resizing required
+Performing an on-line resize of /dev/mapper/VGExaDb-LVDbOra1 to 78643200 (4k) blocks.
+The filesystem on /dev/mapper/VGExaDb-LVDbOra1 is now 78643200 blocks long.
+
+
+
+===========================================================================================================
+
+
+[root@snelnxh22 ~]# df -h /u01
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/VGExaDb-LVDbOra1
+                       99G   83G   11G  89% /u01
+
+					   
+[root@snelnxh22 ~]# vgs
+  VG      #PV #LV #SN Attr   VSize VFree
+  VGExaDb   1   4   0 wz--n- 1.63T 1.45T
+
+  
+[root@snelnxh22 ~]# lvs
+  LV        VG      Attr   LSize   Origin Snap%  Move Log Copy%  Convert
+  LVDbOra1  VGExaDb -wi-ao 100.00G
+  LVDbSwap1 VGExaDb -wi-ao  24.00G
+  LVDbSys1  VGExaDb -wi-ao  30.00G
+  LVDbSys2  VGExaDb -wi-a-  30.00G
+
+  
+[root@snelnxh22 ~]# lvextend -L +200G /dev/mapper/VGExaDb-LVDbOra1
+  Extending logical volume LVDbOra1 to 300.00 GB
+  Logical volume LVDbOra1 successfully resized
+  
+  
+[root@snelnxh22 ~]# resize2fs /dev/mapper/VGExaDb-LVDbOra1
+resize2fs 1.39 (29-May-2006)
+Filesystem at /dev/mapper/VGExaDb-LVDbOra1 is mounted on /u01; on-line resizing required
+Performing an on-line resize of /dev/mapper/VGExaDb-LVDbOra1 to 78643200 (4k) blocks.
+The filesystem on /dev/mapper/VGExaDb-LVDbOra1 is now 78643200 blocks long.
+
+
+
+
+===========================================================================================================
+
+
+[root@snelnxh23 ~]# df -h /u01
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/VGExaDb-LVDbOra1
+                       99G   67G   28G  71% /u01
+					   
+					   
+[root@snelnxh23 ~]# vgs
+  VG      #PV #LV #SN Attr   VSize VFree
+  VGExaDb   1   4   0 wz--n- 1.63T 1.45T
+  
+  
+[root@snelnxh23 ~]# lvs
+  LV        VG      Attr   LSize   Origin Snap%  Move Log Copy%  Convert
+  LVDbOra1  VGExaDb -wi-ao 100.00G
+  LVDbSwap1 VGExaDb -wi-ao  24.00G
+  LVDbSys1  VGExaDb -wi-ao  30.00G
+  LVDbSys2  VGExaDb -wi-a-  30.00G
+  
+  
+[root@snelnxh23 ~]# lvextend -L +200G /dev/mapper/VGExaDb-LVDbOra1
+  Extending logical volume LVDbOra1 to 300.00 GB
+  Logical volume LVDbOra1 successfully resized
+  
+  
+[root@snelnxh23 ~]# resize2fs /dev/mapper/VGExaDb-LVDbOra1
+resize2fs 1.39 (29-May-2006)
+Filesystem at /dev/mapper/VGExaDb-LVDbOra1 is mounted on /u01; on-line resizing required
+Performing an on-line resize of /dev/mapper/VGExaDb-LVDbOra1 to 78643200 (4k) blocks.
+The filesystem on /dev/mapper/VGExaDb-LVDbOra1 is now 78643200 blocks long.
+
+
+
+===========================================================================================================
+
+
+[root@snelnxh24 ~]# df -h /u01
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/VGExaDb-LVDbOra1
+                       99G   63G   32G  67% /u01
+					   
+					   
+[root@snelnxh24 ~]# vgs
+  VG      #PV #LV #SN Attr   VSize VFree
+  VGExaDb   1   4   0 wz--n- 1.63T 1.45T
+  
+  
+[root@snelnxh24 ~]# lvs
+  LV        VG      Attr   LSize   Origin Snap%  Move Log Copy%  Convert
+  LVDbOra1  VGExaDb -wi-ao 100.00G
+  LVDbSwap1 VGExaDb -wi-ao  24.00G
+  LVDbSys1  VGExaDb -wi-ao  30.00G
+  LVDbSys2  VGExaDb -wi-a-  30.00G
+  
+  
+[root@snelnxh24 ~]# lvextend -L +200G /dev/mapper/VGExaDb-LVDbOra1
+  Extending logical volume LVDbOra1 to 300.00 GB
+  Logical volume LVDbOra1 successfully resized
+  
+  
+[root@snelnxh24 ~]# resize2fs /dev/mapper/VGExaDb-LVDbOra1
+resize2fs 1.39 (29-May-2006)
+Filesystem at /dev/mapper/VGExaDb-LVDbOra1 is mounted on /u01; on-line resizing required
+Performing an on-line resize of /dev/mapper/VGExaDb-LVDbOra1 to 78643200 (4k) blocks.
+The filesystem on /dev/mapper/VGExaDb-LVDbOra1 is now 78643200 blocks long.
+

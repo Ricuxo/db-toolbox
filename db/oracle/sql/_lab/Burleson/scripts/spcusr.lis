@@ -1,0 +1,63 @@
+/*  */
+
+
+Choose the Default tablespace for the PERFSTAT user
+--------------------------------------------------- 
+Below is the list of online tablespaces in this database which can
+store user data.  Specifying the SYSTEM tablespace for the user's
+default tablespace will result in the installation FAILING, as
+using SYSTEM for performance data is not supported.
+
+Choose the PERFSTAT users's default tablespace.  This is the tablespace
+in which the STATSPACK tables and indexes will be created.
+
+TABLESPACE_NAME                CONTENTS  STATSPACK DEFAULT TABLESPACE           
+------------------------------ --------- ----------------------------           
+EXAMPLE                        PERMANENT                                        
+PERFSTAT                       PERMANENT                                        
+SYSAUX                         PERMANENT *                                      
+USERS                          PERMANENT                                        
+
+Pressing <return> will result in STATSPACK's recommended default
+tablespace (identified by *) being used.
+
+Enter value for default_tablespace: perfstat
+
+Using tablespace PERFSTAT as PERFSTAT default tablespace.                       
+
+
+Choose the Temporary tablespace for the PERFSTAT user
+----------------------------------------------------- 
+Below is the list of online tablespaces in this database which can
+store temporary data (e.g. for sort workareas).  Specifying the SYSTEM
+tablespace for the user's temporary tablespace will result in the
+installation FAILING, as using SYSTEM for workareas is not supported.
+
+Choose the PERFSTAT user's Temporary tablespace.
+
+TABLESPACE_NAME                CONTENTS  DB DEFAULT TEMP TABLESPACE             
+------------------------------ --------- --------------------------             
+TEMP                           TEMPORARY *                                      
+
+Pressing <return> will result in the database's default Temporary
+tablespace (identified by *) being used.
+
+Enter value for temporary_tablespace: 
+
+Using tablespace TEMP as PERFSTAT temporary tablespace.                         
+
+
+... Creating PERFSTAT user
+
+
+... Installing required packages
+
+
+... Creating views
+
+
+... Granting privileges
+
+NOTE:
+SPCUSR complete. Please check spcusr.lis for any errors.
+

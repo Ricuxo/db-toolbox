@@ -1,0 +1,1 @@
+select table_name from dba_tab_columns where column_name = 'ENDERECO';

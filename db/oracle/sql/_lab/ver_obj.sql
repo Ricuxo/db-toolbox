@@ -1,0 +1,5 @@
+select OWNER, SEGMENT_NAME, SEGMENT_TYPE, sum( BYTES ) / 1024 / 1024 "EM MB"
+from dba_segments
+where TABLESPACE_NAME=upper('&table_space')
+AND OWNER NOT IN ('SYS','SYSTEM')
+GROUP BY OWNER, SEGMENT_NAME, SEGMENT_TYPE;

@@ -1,0 +1,10 @@
+set linesize 500 pages 500
+col value for a90
+col name for a30
+
+select name, value
+from v$parameter
+where name in ('db_name','db_unique_name','log_archive_config', 'log_archive_dest_1','log_archive_dest_2',
+               'log_archive_dest_state_1','log_archive_dest_state_2', 'remote_login_passwordfile',
+               'log_archive_format','log_archive_max_processes','fal_server','db_file_name_convert','client_server',
+               'log_file_name_convert', 'standby_file_management');

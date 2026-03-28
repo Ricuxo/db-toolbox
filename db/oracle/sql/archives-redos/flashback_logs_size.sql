@@ -1,0 +1,1 @@
+SELECT log# as "Log No", thread# as "Thread No", sequence# as "Seq No", name, bytes/1024/1024 as "Size(MB)", first_change# as "First Chg No", first_time from v$flashback_database_logfile order by first_time;

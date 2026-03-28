@@ -1,0 +1,35 @@
+SET ECHO      OFF;
+SET FEEDBACK  OFF;
+SET VERIFY    OFF;
+SET PAGESIZE  0;
+SET TERMOUT   ON;
+SET HEADING   OFF;
+SET TRIMSPOOL ON;
+spool tablespaces_monitored.txt
+
+set pages 1000
+SELECT 'CONDITION OBJECT "'||b.instance_name||':'||a.tablespace_name||'" THRESHOLD '||
+CASE
+    when a.GIGAS < 101  then '15'
+    when a.GIGAS < 501  then '10'
+    when a.GIGAS < 1001  then '5'
+    when a.GIGAS < 3001  then '3'
+    else '2'
+END
+||' '
+FROM
+(
+SELECT D.TABLESPACE_NAME, SUM(D.BYTES)/1024/1024/1024 GIGAS
+FROM DBA_DATA_FILES D ,DBA_TABLESPACES T
+WHERE D.TABLESPACE_NAME = T.TABLESPACE_NAME
+AND   T.CONTENTS NOT IN ('UNDO','TEMPORARY')
+AND   T.BIGFILE  NOT IN ('YES')
+GROUP BY D.TABLESPACE_NAME
+) a, v$instance b
+ORDER BY TABLESPACE_NAME
+/
+spool off;
+clear columns
+clear computes
+SET PAGESIZE  50;
+SET HEADING   ON

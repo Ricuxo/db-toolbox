@@ -1,0 +1,34 @@
+/*  */
+alter rollback segment r01 offline;
+alter rollback segment r02 offline;
+alter rollback segment r03 offline;
+alter rollback segment r04 offline;
+alter rollback segment r05 offline;
+alter rollback segment r06 offline;
+rem alter rollback segment r07 offline;
+rem alter rollback segment r08 offline;
+drop rollback segment r01;
+drop rollback segment r02;
+drop rollback segment r03;
+drop rollback segment r04;
+drop rollback segment r05;
+drop rollback segment r06;
+rem drop rollback segment r07;
+rem drop rollback segment r08;
+@defrag7
+create rollback segment r01 tablespace rbs storage(initial 6m next 6m optimal 12m);
+create rollback segment r02 tablespace rbs storage(initial 6m next 6m optimal 12m);
+create rollback segment r03 tablespace rbs storage(initial 6m next 6m optimal 12m);
+create rollback segment r04 tablespace rbs storage(initial 6m next 6m optimal 12m);
+create rollback segment r05 tablespace rbs storage(initial 6m next 6m optimal 12m);
+create rollback segment r06 tablespace rbs storage(initial 6m next 6m optimal 12m);
+rem create rollback segment r07 tablespace rbs storage(initial 2m next 2m optimal 6m);
+rem create rollback segment r08 tablespace rbs storage(initial 2m next 2m optimal 6m);
+alter rollback segment r01 online;
+alter rollback segment r02 online;
+alter rollback segment r03 online;
+alter rollback segment r04 online;
+alter rollback segment r05 online;
+alter rollback segment r06 online;
+rem alter rollback segment r07 online;
+rem alter rollback segment r08 online;

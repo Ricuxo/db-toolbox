@@ -1,0 +1,13 @@
+set pagesize 9999
+set linesize 165
+
+col ROLE format a30
+col PASSWORD_REQUIRED format a8
+col AUTHENTICATION_TYPE format a11
+
+SELECT ROLE
+     , PASSWORD_REQUIRED
+     , AUTHENTICATION_TYPE
+  FROM DBA_ROLES
+ WHERE ROLE LIKE NVL('&LROLE', ROLE)
+/

@@ -1,0 +1,49 @@
+select * from DBA_AUTOTASK_WINDOW_CLIENTS;
+
+select CLIENT_NAME,WINDOW_NAME,JOB_STATUS,JOB_START_TIME,JOB_DURATION from DBA_AUTOTASK_JOB_HISTORY order by 4;
+
+
+select program_name, program_action from dba_scheduler_programs where program_name = 'AUTO_SQL_TUNING_PROG';
+
+
+--SELECT task_name, status, TO_CHAR(execution_end,'DD-MON-YY HH24:MI')
+SELECT *
+FROM dba_advisor_executions
+WHERE task_name='SYS_AUTO_SQL_TUNING_TASK'
+ORDER BY execution_end;
+
+select * from Dba_Scheduler_Job_Run_Details WHERE status <> 'SUCCEEDED';
+
+
+
+
+ set colsep "|"
+ set linesize 32767
+ set pagesize 10000
+ column WINDOW_NAME         format A20
+ column CLIENT_NAME         format A35
+ column JOB_STATUS          format A15
+ column JOB_START_TIME      format A25
+ column JOB_DURATION        format A20
+ column JOB_ERROR           format 9999
+ SELECT
+ WINDOW_NAME       ,
+ CLIENT_NAME       ,
+ JOB_STATUS        ,
+ JOB_START_TIME    ,
+ JOB_DURATION      ,
+ JOB_ERROR
+ FROM DBA_AUTOTASK_JOB_HISTORY
+ WHERE job_start_time >= SYSDATE -7
+ ORDER BY job_start_time DESC;
+ 
+ 
+ 
+ 
+ COLUMN parameter_value FORMAT A30
+SELECT parameter_name, parameter_value
+FROM dba_advisor_parameters
+WHERE task_name = 'SYS_AUTO_SQL_TUNING_TASK'
+AND parameter_name IN ('TIME_LIMIT',
+'DEFAULT_EXECUTION_TYPE',
+'LOCAL_TIME_LIMIT');

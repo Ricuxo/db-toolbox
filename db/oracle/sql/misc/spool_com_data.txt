@@ -1,0 +1,17 @@
+In SQL*Plus this is what you can do to get the current date/time as part of the spool file:
+============================================================================================
+column tm new_value file_time noprint
+select to_char(sysdate, 'YYYYMMDD') tm from dual ;
+1 row selected.
+
+prompt &file_time
+
+spool C:\Temp\logfile_id&file_time..log
+.
+.
+. /* put your code here */
+. /* it will go to a file called C:\Temp\logfile_id20020816.log */
+.
+.
+spool off
+

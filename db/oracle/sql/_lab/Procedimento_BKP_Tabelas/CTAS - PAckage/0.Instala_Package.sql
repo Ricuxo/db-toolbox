@@ -1,0 +1,7 @@
+@"?\1.ddl_Create_User_CTAS.sql"
+@"?\2.grants.sql"
+@"?\3.ddl_sequence.sql"
+@"?\4.ddl_CTAS_CB_LIST.sql"
+@"?\5.ddl_CTAS_CB_OPER_LOG.sql"
+@"?\6.ddl_pkg_change_backup.sql"
+@"?\7.ddl_synonym.sql"

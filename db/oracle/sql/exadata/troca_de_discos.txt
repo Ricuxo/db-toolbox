@@ -1,0 +1,13 @@
+Boa tarde, Todos!
+
+Atualmente estamos com um disco com problema na Expansão de Storage  do Exadata do Siebelp2.
+
+O Disco já foi deletado pelo ASM, e o próximo passo é a Oracle Realizar a troca do disco.
+
+Nos documento em anexo segue o procedimento de troca dos discos.
+
+Documento 1 – 1386147.1 – Falha de discos
+
+Documento 2 – 1390836.1 – Disco com baixo desempenho.
+
+ 

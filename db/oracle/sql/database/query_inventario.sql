@@ -1,0 +1,1 @@
+select dbms_sqlpatch.verify_queryable_inventory from dual;

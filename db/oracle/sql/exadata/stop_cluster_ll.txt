@@ -1,0 +1,2 @@
+ dcli -g ~/dbs_group -l root /u01/app/11.2.0/grid/bin/crsctl stop crs
+ dcli -g ~/dbs_group -l root /u01/app/11.2.0/grid/bin/crsctl start crs

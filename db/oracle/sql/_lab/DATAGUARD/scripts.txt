@@ -1,0 +1,59 @@
+## COMANDO PARA PARAR O RECOVERY MANAGER DO DATAGUARD
+######################################################################################################
+1 - Acessar o banco de dados Standby
+2 - Executar o comando: 
+	 ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL;
+
+## verificar se existe LAG no dataguard
+######################################################################################################
+1 - Acessar o banco de dados Standby
+2 - Executar a query: 
+	col NAME for a14
+	col value for a15
+	SELECT name, value, datum_time, time_computed FROM V$DATAGUARD_STATS  WHERE name like 'apply lag';
+
+	
+	EXEMPLO:
+	--------------------------------------------------------------------------------------------
+	NAME           VALUE           DATUM_TIME                     TIME_COMPUTED
+	-------------- --------------- ------------------------------ ------------------------------
+	apply lag      +00 01:12:47    04/28/2015 16:37:40            04/28/2015 16:37:42
+
+	
+	
+	A coluna "VALUE" indica a quantidade de tempo que esta atrasado.
+	
+	
+## verificar qual o archive que esta sendo aplicado no banco de dados Standby
+########################################################################################################
+1 - Acessar o banco de dados Standby (Executar varias vezes para ver os blocos sendo alterados e a sequence)
+2 - Executar a query: 
+	select PROCESS, SEQUENCE#, THREAD#, BLOCK#, BLOCKS, TO_CHAR(SYSDATE, 'DD-MON-YYYY HH:MI:SS') TIME from V$MANAGED_STANDBY where PROCESS='MRP0';
+	
+	EXEMPLO DE OUTPUT
+	--------------------------------------------------------------------------
+	PROCESS    SEQUENCE#    THREAD#     BLOCK#     BLOCKS TIME
+	--------- ---------- ---------- ---------- ---------- --------------------
+	MRP0            1012          2     264008     628188 28-APR-2015 04:37:38
+
+	Se não retornar valores, é necessario verificar se o dataguard esta recebendo os archives ou se o standby nao esta em modo de recovery
+	(ALTER DATABASE RECOVER MANAGED STANDBY DATABASE  USING CURRENT LOGFILE DISCONNECT FROM SESSION;)
+	
+## Verificar GAP
+########################################################################################################
+1 - Acessar o banco de dados Standby
+2 - Executar a query: 
+SELECT al.thrd "THREAD", almax "ULTIMA SEQ RECEBIDA", lhmax "ULTIMA SEQ APLICADA", (almax-lhmax) GAP FROM (select thread# thrd, MAX(sequence#) almax FROM v$archived_log WHERE resetlogs_change#=(SELECT resetlogs_change# FROM v$database) GROUP BY thread#) al, (SELECT thread# thrd, MAX(sequence#) lhmax FROM v$log_history WHERE resetlogs_change#=(SELECT resetlogs_change# FROM v$database) GROUP BY thread#) lh WHERE al.thrd = lh.thrd;
+
+
+
+## VERIFICAR SE EXISTE ERROS DE COMUNICAÇÃO ENTRES O PRIMARIO E O STANDBY, ARCHIVES QUES ESTAO SENDO ENVIADOS OU RECEBIDOS, ARCHIVES APLICADOS
+## Quando executado no primario, ele mostra o archive que foi gerado, e a transferencia para o standby. Ele tambem mostra se existe erro de comunicação.
+## Quando executado no Standby, ele mostra o archive sendo recebido, aplicado no banco de dados, e possivel falha de comunicação com o primario.
+########################################################################################################
+1 - Acessar o banco de dados Primario ou Standby
+2 - Executar a query: 
+set lines 160
+col MESSAGE for a100
+col TIMESTAMP for a20
+select message, 	TO_CHAR(TIMESTAMP, 'DD-MM-RRRR HH24:MI:SS') "TIMESTAMP" from v$dataguard_status;

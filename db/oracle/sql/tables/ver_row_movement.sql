@@ -1,0 +1,1 @@
+select owner,table_name,row_movement from dba_tables;

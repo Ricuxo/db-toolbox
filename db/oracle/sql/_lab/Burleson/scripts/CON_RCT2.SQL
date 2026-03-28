@@ -1,0 +1,253 @@
+/*  */
+REM CON_RCT.SQL
+REM
+REM FUNCTION: SCRIPT FOR RE-CREATING DATABASE CONSTRAINTS 
+REM
+REM FUNCTION: This script must be run by the constraint owner.  
+REM 
+REM FUNCTION: This script is intended to run with Oracle7.
+REM
+REM FUNCTION: Running this script will in turn create scripts to build 
+REM           constraints owned in the database. The scripts are called 
+REM           'pk_rct.sql', 'fk_rct.sql', and 'ck_rct.sql'. 
+REM           The primary key and unique constraints will include the
+REM           USING INDEX clause, you may point this to an INDEX
+REM           tablespace if the constraints don’t already. The foreign
+REM           key constraints build an index if one exists with the 
+REM           same name as the constraint. Otherwise, the foreign key
+REM           isn’t built.  You may wish to edit this part of the 
+REM           script if this isn’t the case in your database
+REM 
+REM Only preliminary testing of this script was performed.  Be sure to
+REM test it completely before relying on it.  
+REM
+REM
+ 
+set verify off
+rem set feedback off
+rem set termout off
+rem set echo off
+set pagesize 0
+set long 4000
+set termout on
+select 'Creating constraint build script...' from dual;
+rem set termout off
+ 
+create table cons_temp (owner varchar2(30),
+			constraint_name varchar2(30),
+			constraint_type varchar2(11),
+			search_condition varchar2(2000),
+			table_name varchar2(30),
+			referenced_owner varchar2(30),
+			referenced_constraint varchar2(30),
+			delete_rule varchar2(9),
+			constraint_columns varchar2(2000),
+			con_number number); 
+
+DECLARE
+ 
+   CURSOR cons_cursor(tab_owner varchar2, tab_name varchar2) IS 
+                      select	owner,
+   				constraint_name, 
+   decode(constraint_type,'P','Primary Key',
+	  		'R','Foreign Key',
+			'U','Unique',
+			'C','Check',
+			'D','Default'),
+   				table_name,
+   				search_condition, 
+				r_owner,
+				r_constraint_name,
+				delete_rule
+     from dba_constraints 
+     where owner = tab_owner and
+     table_name= tab_name; 
+
+     cursor cons_col(tab_owner varchar2, tab_name varchar2) is 
+          select 
+	   	owner,
+	   	constraint_name,
+		column_name
+     from dba_cons_columns 
+     where owner = tab_owner
+     and table_name=tab_name
+     order by owner, constraint_name, 
+				position;
+
+	cursor get_cons is
+	select distinct 
+		OWNER,TABLE_NAME,CONSTRAINT_NAME,CONSTRAINT_TYPE
+	from cons_temp
+	order by owner,table_name,constraint_name;
+
+	tab_nam			user_constraints.table_name%TYPE;
+  	cons_owner		user_constraints.owner%TYPE;
+  	cons_name  		user_constraints.constraint_name%TYPE;
+  	cons_type		varchar2(11);
+  	cons_sc		user_constraints.search_condition%TYPE;
+	cons_tname		user_constraints.table_name%TYPE;
+	cons_rowner		user_constraints.r_owner%TYPE;
+	cons_rcons		user_constraints.r_constraint_name%TYPE;
+	cons_dr			user_constraints.delete_rule%TYPE;   
+	cons_col_own		user_cons_columns.owner%TYPE;
+	cons_col_nam		user_cons_columns.constraint_name%TYPE;
+	cons_column		user_cons_columns.column_name%TYPE;
+	cons_tcol_name	user_cons_columns.table_name%TYPE;
+	all_columns 		varchar2(2000);
+	counter			integer:=0;
+	cons_nbr 		integer;
+
+BEGIN
+   OPEN cons_cursor('&&tab_name','&&own_name');
+   LOOP
+      FETCH cons_cursor INTO 	cons_owner,
+      				cons_name,
+      				cons_type,
+      				cons_sc,
+      				cons_tname,
+      				cons_rowner,
+				cons_rcons,
+      				cons_dr;
+      EXIT WHEN cons_cursor%NOTFOUND;
+	all_columns :='';	
+	counter := 0;
+	open cons_col('&&tab_name','&&own_name');
+	loop
+		fetch cons_col into
+					cons_col_own,
+	   				cons_col_nam,
+	   				cons_column;
+	exit when cons_col%NOTFOUND; 
+		if cons_owner = cons_col_own and cons_name=cons_col_nam
+		then
+			counter := counter+1;
+			if counter = 1 then
+			all_columns := all_columns||cons_column;
+			else
+			all_columns := all_columns||', '||cons_column;
+			end if;
+		end if;
+	end loop;
+	close cons_col;
+	insert into cons_temp values (cons_owner,
+				      cons_name,
+				      cons_type,
+				      cons_tname,
+				      cons_sc,
+				      cons_rowner,
+				      cons_rcons,
+				      cons_dr,
+				all_columns,
+				0);
+   commit;
+   END LOOP;
+   CLOSE cons_cursor;
+   commit;
+begin
+  open get_cons;
+  cons_nbr:=0;
+  loop
+    fetch get_cons into cons_owner,
+			cons_tname,
+			cons_name,
+			cons_type;
+    exit when get_cons%NOTFOUND;
+    cons_nbr:=cons_nbr+1;
+    sys.dbms_output.put_line('cons_nbr='||cons_nbr);
+    sys.dbms_output.put_line(cons_owner||'.'||cons_name||' '||cons_type);
+    update cons_temp set con_number=cons_nbr where
+	constraint_name=cons_name and
+	constraint_type=cons_type and
+	owner=cons_owner;
+  end loop;
+  close get_cons;
+  commit;
+end;
+END;
+/
+REM The following indexes make the create part of this script run
+REM much faster
+REM
+create index pk_cons_temp on cons_temp(constraint_name);
+create index lk_cons_temp on cons_temp(constraint_type);
+create index lk_cons_temp2 on cons_temp(referenced_constraint);
+
+set heading off feedback off pages 0 termout off echo off
+set recsep off verify off
+set embedded on
+define cr='chr(10)'
+REM
+REM Do the check and default values first since they are usually 
+REM the smallest
+REM
+spool ck_rct.sql
+select 'alter table '||a.table_name||&&cr||
+'drop constraint '||a.constraint_name||';'||&&cr||
+'alter table '||a.table_name||' add constraint '||a.constraint_name||&&cr||
+constraint_type||'( '||a.search_condition||' )'||&&cr||
+';'
+from cons_temp a where constraint_type in ( 'Check','Default' ) and
+search_condition not like '%NULL%'
+/
+spool off
+REM
+REM Next, do the primary constraints
+REM
+spool pk_rct.sql
+select 'alter table '||a.table_name||&&cr||
+'drop constraint '||a.constraint_name||';'||&&cr||
+'drop index '||a.constraint_name||';'||&&cr||
+'alter table '||a.table_name||' add constraint '||a.constraint_name||&&cr||
+constraint_type||'( '||a.constraint_columns||' )'||&&cr||
+'using index tablespace '||b.tablespace_name||&&cr||
+'pctfree '||b.pct_free||&&cr||
+'initrans '||b.ini_trans||&&cr||
+'maxtrans '||b.max_trans||&&cr||
+'storage ('||&&cr||
+'initial '||b.initial_extent||&&cr||
+'next '||b.next_extent||&&cr||
+'minextents '||b.min_extents||&&cr||
+'maxextents '||b.max_extents||&&cr||
+'pctincrease '||b.pct_increase||&&cr||
+')'||&&cr||
+';'
+from cons_temp a, user_indexes b where
+a.constraint_type in ('Primary Key','Unique') and
+a.constraint_name=b.index_name 
+/
+spool off
+REM
+REM Finally do the foreign key constraints
+REM
+spool fk_rct.sql
+select 'alter table '||a.table_name||&&cr||
+'drop constraint '||a.constraint_name||';'||&&cr||
+'drop index '||c.index_name||';'||&&cr||
+'alter table '||a.table_name||' add constraint '||a.constraint_name||' '||a.constraint_type||'('||&&cr||
+ a.constraint_columns||' )'||&&cr||
+'references '||a.referenced_owner||'.'||b.table_name||' ('||&&cr||
+b.constraint_columns||' )'||&&cr||
+decode (a.delete_rule,'CASCADE','on delete cascade','')||&&cr||
+';'||&&cr||
+'create index '||c.index_name||' on '||a.table_name||'('||&&cr||
+a.constraint_columns||')'||&&cr||
+'tablespace '||c.tablespace_name||&&cr||
+'pctfree '||c.pct_free||' '||'initrans '||c.ini_trans||' maxtrans '||c.max_trans||&&cr||
+'storage ( '||'initial '||c.initial_extent||' next '||c.next_extent||&&cr||
+'minextents '||c.min_extents||' maxextents '||c.max_extents||&&cr||
+'pctincrease '||c.pct_increase||&&cr||
+')'||&&cr||
+';'
+from cons_temp a, cons_temp b, user_indexes c
+where a.constraint_type = 'Foreign Key' and
+a.referenced_constraint=b.constraint_name 
+and a.constraint_name=c.index_name
+/
+rem drop table cons_temp;
+
+set heading on feedback on pages 22 termout on echo on
+set recsep on verify on
+set embedded off
+undef cr
+clear columns
+

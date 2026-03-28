@@ -1,0 +1,1137 @@
+SQL> select thread#, max(sequence#) "Last Primary Seq Generated"
+from v$archived_log val, v$database vdb
+where val.resetlogs_change# = vdb.resetlogs_change#
+group by thread# order by 1;  2    3    4
+
+   THREAD# Last Primary Seq Generated
+---------- --------------------------
+         1                     105467
+		 
+		 
+SQL> select HXFIL File_num,substr(HXFNM,1,75) name,FHTYP Type,HXERR Validity,FHSCN SCN, FHTNM TABLESPACE_NAME,FHSTA status ,FHRBA_SEQ Sequence from X$KCVFH;
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+         1
+/esdpdata_01/oradata/ESDPDBP1/system_01.dbf
+         3          0 14486690550009   SYSTEM                               8196
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+         2
+/esdpundo_01/oradata/ESDPDBP1/undotbs_01.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+         3
+/esdpdata_01/oradata/ESDPDBP1/sysaux_01.dbf
+         3          0 14486690550009   SYSAUX                                  4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+         4
+/esdpdata_01/oradata/ESDPDBP1/users_01.dbf
+         3          0 14486690550009   USERS                                   4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+         5
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_01.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+         6
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_02.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+         7
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_01.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+         8
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+         9
+/esdpdata_01/oradata/ESDPDBP1/sysaux_02.dbf
+         3          0 14486690550009   SYSAUX                                  4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        10
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_03.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        11
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_04.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        12
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_05.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        13
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_02_01.dbf
+         3          0 14486690550009   CDB_DATA_02                             4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        14
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_02_02.dbf
+         3          0 14486690550009   CDB_DATA_02                             4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        15
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_01.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        16
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_02.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        17
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_06.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        18
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_07.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        19
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_08.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        20
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_03.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        21
+/esdpdata_01/oradata/ESDPDBP1/sysaux_03.dbf
+         3          0 14486690550009   SYSAUX                                  4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        22
+/esdpdata_01/oradata/ESDPDBP1/users_02.dbf
+         3          0 14486690550009   USERS                                   4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        23
+/esdpdata_01/oradata/ESDPDBP1/sysaux_04.dbf
+         3          0 14486690550009   SYSAUX                                  4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        24
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_04.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        25
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_05.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        26
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_06.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        27
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_07.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        28
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_03.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        29
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_08.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        30
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_04.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        31
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_09.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        32
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_05.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        33
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_10.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        34
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_11.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        35
+/esdpdata_01/oradata/ESDPDBP1/sysaux_05.dbf
+         3          0 14486690550009   SYSAUX                                  4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        36
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_06.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        37
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_07.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        38
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_08.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        39
+/esdpindx_02/oradata/ESDPDBP1/undotbs_02.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        40
+/esdpindx_02/oradata/ESDPDBP1/undotbs_03.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        41
+/esdpdata_03/oradata/ESDPDBP1/cdb_data_12.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        42
+/esdpindx_01/oradata/ESDPDBP1/undotbs_04.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        43
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_09.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        44
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_10.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        45
+/esdpindx_04/oradata/ESDPDBP1/undotbs_05.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        46
+/esdpindx_04/oradata/ESDPDBP1/undotbs_06.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        47
+/esdpindx_04/oradata/ESDPDBP1/undotbs_07.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        48
+/esdpindx_04/oradata/ESDPDBP1/undotbs_08.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        49
+/esdpdata_03/oradata/ESDPDBP1/cdb_data_13.dbf
+         3          0 14486690550009   CDB_DATA                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        50
+/esdpindx_04/oradata/ESDPDBP1/undotbs_09.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        51
+/esdpindx_04/oradata/ESDPDBP1/undotbs_10.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        52
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_02_09.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        53
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_02_10.dbf
+         3          0 14486690550009   CDB_INDEX_02                            4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        54
+/esdpindx_04/oradata/ESDPDBP1/undotbs_11.dbf
+         3          0 14486690550009   UNDOTBS1                                4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        55
+/esdpdata_01/oradata/ESDPDBP1/sysaux_06.dbf
+         3          0 14486690550009   SYSAUX                                  4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        56
+/esdpdata_03/oradata/ESDPDBP1/sysaux_07.dbf
+         3          0 14486690550009   SYSAUX                                  4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        57
+/esdpdata_03/oradata/ESDPDBP1/sysaux_08.dbf
+         3          0 14486690550009   SYSAUX                                  4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        58
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_11.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        59
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_12.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+  FILE_NUM
+----------
+NAME
+--------------------------------------------------------------------------------
+      TYPE   VALIDITY SCN              TABLESPACE_NAME                    STATUS
+---------- ---------- ---------------- ------------------------------ ----------
+  SEQUENCE
+----------
+        60
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_13.dbf
+         3          0 14486690550009   CDB_INDEX                               4
+    105468
+
+
+60 rows selected.
+
+SQL> select substr(name,1,60), recover, fuzzy, checkpoint_change#, resetlogs_change#,resetlogs_time from v$datafile_header;
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpdata_01/oradata/ESDPDBP1/system_01.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpundo_01/oradata/ESDPDBP1/undotbs_01.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/sysaux_01.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpdata_01/oradata/ESDPDBP1/users_01.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_01.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_02.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_01.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/sysaux_02.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_03.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_04.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_05.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_02_01.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_02_02.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_01.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_02.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_06.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_07.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_01/oradata/ESDPDBP1/cdb_index_02_08.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_03.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/sysaux_03.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpdata_01/oradata/ESDPDBP1/users_02.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/sysaux_04.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_04.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpdata_01/oradata/ESDPDBP1/cdb_data_05.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_06.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_07.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_03.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_08.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_04.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_09.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_05.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_10.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpdata_02/oradata/ESDPDBP1/cdb_data_11.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_01/oradata/ESDPDBP1/sysaux_05.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_06.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_07.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_02/oradata/ESDPDBP1/cdb_index_08.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_02/oradata/ESDPDBP1/undotbs_02.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_02/oradata/ESDPDBP1/undotbs_03.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_03/oradata/ESDPDBP1/cdb_data_12.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_01/oradata/ESDPDBP1/undotbs_04.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_09.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_10.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_04/oradata/ESDPDBP1/undotbs_05.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_04/oradata/ESDPDBP1/undotbs_06.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_04/oradata/ESDPDBP1/undotbs_07.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_04/oradata/ESDPDBP1/undotbs_08.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpdata_03/oradata/ESDPDBP1/cdb_data_13.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_04/oradata/ESDPDBP1/undotbs_09.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_04/oradata/ESDPDBP1/undotbs_10.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_02_09.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_02_10.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_04/oradata/ESDPDBP1/undotbs_11.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpdata_01/oradata/ESDPDBP1/sysaux_06.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_03/oradata/ESDPDBP1/sysaux_07.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpdata_03/oradata/ESDPDBP1/sysaux_08.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+SUBSTR(NAME,1,60)
+--------------------------------------------------------------------------------
+REC FUZ CHECKPOINT_CHANGE# RESETLOGS_CHANGE# RESETLOG
+--- --- ------------------ ----------------- --------
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_11.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_12.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+/esdpindx_03/oradata/ESDPDBP1/cdb_index_13.dbf
+NO  YES         1,4487E+13        1,2959E+13 11/11/12
+
+
+60 rows selected.

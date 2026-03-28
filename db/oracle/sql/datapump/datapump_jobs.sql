@@ -1,0 +1,7 @@
+colowner_namefora30
+coljob_namefora30
+coloperationfora30
+coljob_modefora30
+colattached_sessionsfor99999999999999999
+colstatefora30
+selectowner_name,job_name,operation,job_mode,state,attached_sessionsfromdba_datapump_jobs;

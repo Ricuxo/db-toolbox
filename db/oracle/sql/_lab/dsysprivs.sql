@@ -1,0 +1,13 @@
+set linesize 150
+set pagesize 500
+
+col GRANTEE format a30
+col PRIVILEGE format a40
+col ADMIN_OPTION format a12
+
+SELECT GRANTEE
+     , PRIVILEGE
+     , ADMIN_OPTION
+  FROM DBA_SYS_PRIVS
+ WHERE GRANTEE = NVL('&GRANTEE', GRANTEE)
+/

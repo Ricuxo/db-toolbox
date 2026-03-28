@@ -1,0 +1,1 @@
+[celladmin@sneN08cel02adm ~]# perl /home/celladmin/metric_iorm.pl "where collectionTime > '2015-05-26T10:00:00-03:00' and collectionTime < '2015-05-26T15:00:00-03:00'"

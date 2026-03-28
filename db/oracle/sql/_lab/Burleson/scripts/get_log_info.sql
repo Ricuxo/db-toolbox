@@ -1,0 +1,13 @@
+/*  */
+COLUMN log_id FORMAT 999999
+COLUMN filename FORMAT A45
+COLUMN low_scn  FORMAT 9999999
+COLUMN high_scn FORMAT 9999999
+SET LINES 132 PAGES 45
+@title132 'Log Miner Log Files'
+SPOOL rep_out\&&db\log_miner
+select LOG_ID,FILENAME,LOW_TIME,HIGH_TIME,LOW_SCN,NEXT_SCN
+from v$logmnr_logs
+/
+SPOOL OFF
+SET LINES 80 PAGES 22
