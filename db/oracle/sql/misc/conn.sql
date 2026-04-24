@@ -1,4 +1,3 @@
--- limpa tela
 clear screen
 
 prompt ========================================
@@ -12,20 +11,29 @@ accept v_port prompt 'Porta: '
 accept v_service prompt 'Service Name: '
 accept v_sys prompt 'Conectar como SYSDBA? (S/N): '
 
--- monta string
-column conn_string new_value conn_string
-
-select 
-case 
-    when upper('&v_sys') = 'S' then
-        '&v_user/&v_pass@//&v_host:&v_port/&v_service as sysdba'
-    else
-        '&v_user/&v_pass@//&v_host:&v_port/&v_service'
-end as conn_string
-from dual;
+-- normaliza entrada
+column v_sys_clean new_value v_sys_clean
+select case when upper('&v_sys') = 'S' then 'S' else 'N' end v_sys_clean from dual;
 
 prompt
 prompt Conectando...
 prompt
 
-connect &conn_string
+-- conexão
+connect &v_user/&v_pass@//&v_host:&v_port/&v_service&v_sys_clean
+
+-- ajuste final para SYSDBA
+-- hack necessário por limitação do sqlplus
+-- reexecuta conexão se for sysdba
+column dummy new_value dummy
+select case 
+       when '&v_sys_clean' = 'S' then 
+           'connect &v_user/&v_pass@//&v_host:&v_port/&v_service as sysdba'
+       else 
+           'prompt Conectado.'
+       end dummy
+from dual;
+
+&dummy
+
+set sqlprompt "_USER'@'_CONNECT_IDENTIFIER> " 

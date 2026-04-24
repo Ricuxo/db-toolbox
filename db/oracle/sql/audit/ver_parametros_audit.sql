@@ -1,0 +1,1 @@
+SELECT * FROM dba_audit_mgmt_config_params;
