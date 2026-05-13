@@ -7,4 +7,4 @@ db.getUsers().users.map(u => ({ user: u.user, roles: u.roles }))
 db.system.users.find({}, { user: 1, roles: 1, _id: 0 })
 
 //Buscar por nome
-db.getUser("hubmonitor", { showAuthenticationRestrictions: true })
+db.getUser("portaltopazio", { showAuthenticationRestrictions: true })
