@@ -11,5 +11,5 @@ FROM
     x$dbgalertext
 WHERE
 originating_timestamp > (sysdate - &days)
---AND
---message_text like '%ORA-%';
+AND
+message_text like '%ORA-%';
