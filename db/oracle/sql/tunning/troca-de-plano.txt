@@ -1,0 +1,193 @@
+
+SQL_ID = 8kdq7660j4t6c
+
+
+---- Verificar plano atual (memória)
+
+SELECT sql_id, status, sql_plan_hash_value, sql_exec_start
+FROM   v$sql_monitor
+WHERE  sql_id = '8kdq7660j4t6c'
+ORDER  BY sql_exec_start DESC
+FETCH FIRST 5 ROWS ONLY;
+
+
+---- Verificar plano usado (hsitórico)
+
+SELECT sql_id, plan_hash_value, executions_delta,
+       ROUND(elapsed_time_delta/1e6) elapsed_seg,
+       ROUND(elapsed_time_delta/NULLIF(executions_delta,0)/1e6) seg_por_exec
+FROM   dba_hist_sqlstat
+WHERE  sql_id = '8kdq7660j4t6c'
+AND    snap_id > (SELECT MAX(snap_id) - 50 FROM dba_hist_snapshot)
+ORDER  BY snap_id DESC;
+
+/*
+SQL_ID          PLAN_HASH_VALUE EXECUTIONS_DELTA ELAPSED_SEG SEG_POR_EXEC
+------------- ----------------- ---------------- ----------- ------------
+8kdq7660j4t6c        3919208543                0        8789
+8kdq7660j4t6c        3919208543                0       20879
+8kdq7660j4t6c        3919208543                1          13           13
+8kdq7660j4t6c        3919208543                0       25849
+8kdq7660j4t6c        3919208543                1       23125        23125
+8kdq7660j4t6c        3919208543                0        7127
+8kdq7660j4t6c        3919208543                1          15           15
+8kdq7660j4t6c        3919208543                0       26575
+8kdq7660j4t6c        3919208543                0       23180
+8kdq7660j4t6c        3919208543                0          12
+8kdq7660j4t6c        3919208543                1          14           14
+8kdq7660j4t6c        3919208543                0       27575
+*/
+
+--- Verificar troca de plano entre datas
+
+SELECT TO_CHAR(begin_interval_time,'DD/MM HH24:MI') snap,
+       plan_hash_value,
+       executions_delta exec,
+       ROUND(elapsed_time_delta/1e6) elapsed_seg,
+       ROUND(buffer_gets_delta/NULLIF(executions_delta,0)) gets_exec,
+       ROUND(disk_reads_delta/NULLIF(executions_delta,0)) reads_exec
+FROM   dba_hist_sqlstat s, dba_hist_snapshot sn
+WHERE  s.sql_id = '8kdq7660j4t6c'
+AND    s.snap_id = sn.snap_id
+AND    s.instance_number = sn.instance_number
+AND    sn.begin_interval_time BETWEEN TO_DATE('10/06/2026 00:00','DD/MM/YYYY HH24:MI')
+                                  AND TO_DATE('12/06/2026 06:00','DD/MM/YYYY HH24:MI')
+ORDER  BY sn.begin_interval_time;
+
+/*
+SNAP          PLAN_HASH_VALUE       EXEC ELAPSED_SEG  GETS_EXEC READS_EXEC
+----------- ----------------- ---------- ----------- ---------- ----------
+10/06 01:00         675077948          1         272   99061323     477186
+10/06 02:00         675077948          1         443  205742997     691124
+11/06 01:00        3919208543          0       27575
+11/06 01:00        3919208543          1          14       1935          0
+11/06 02:00        3919208543          0       23180
+11/06 02:00        3919208543          0          12
+11/06 03:00        3919208543          1          15         13          0
+11/06 03:00        3919208543          0       26575
+11/06 04:00        3919208543          0        7127
+12/06 01:00        3919208543          1       23125   43405936   11739881
+12/06 02:00        3919208543          0       25849
+12/06 03:00        3919208543          1          13         13          0
+12/06 03:00        3919208543          0       20879
+12/06 04:00        3919208543          0        8789
+*/
+
+
+
+Primeiro passo só: confirmar os snaps em que o plano 675077948 existe no AWR.
+
+SELECT MIN(snap_id) snap_min, MAX(snap_id) snap_max
+FROM   dba_hist_sqlstat
+WHERE  sql_id = '8kdq7660j4t6c'
+AND    plan_hash_value = 675077948;
+
+
+
+Validar profile e matching
+
+Antes de partir para baseline, preciso confirmar duas coisas sobre esse profile:
+SELECT name, category, status, force_matching, signature, created
+FROM   dba_sql_profiles
+WHERE  name = 'coe_8kdq7660j4t6c_675077948';
+
+E a assinatura da query atual em cache:
+SELECT sql_id, force_matching_signature, exact_matching_signature
+FROM   v$sql
+WHERE  sql_id = '8kdq7660j4t6c'
+AND    rownum = 1;
+
+
+drop profile
+EXEC DBMS_SQLTUNE.DROP_SQL_PROFILE('coe_8kdq7660j4t6c_675077948');
+
+Pegar bind de uma execução 
+
+SELECT position, datatype_string, value_string, last_captured
+FROM   dba_hist_sqlbind
+WHERE  sql_id = '8kdq7660j4t6c'
+AND    position IN (50,56)
+ORDER  BY snap_id DESC, position
+FETCH FIRST 10 ROWS ONLY;
+
+
+
+
+SELECT s.sql_id, s.plan_hash_value,
+       SUM(s.executions_delta)              execs,
+       ROUND(SUM(s.elapsed_time_delta)/1e6) elapsed_s,
+       ROUND(SUM(s.cpu_time_delta)/1e6)     cpu_s,
+       ROUND(SUM(s.iowait_delta)/1e6)       iowait_s,
+       SUM(s.buffer_gets_delta)             buffer_gets,
+       SUM(s.disk_reads_delta)              disk_reads,
+       SUM(s.rows_processed_delta)          rows_proc
+FROM   dba_hist_sqlstat s
+JOIN   dba_hist_snapshot sn
+       ON sn.snap_id = s.snap_id AND sn.instance_number = s.instance_number
+WHERE  s.sql_id = '8kdq7660j4t6c'
+  AND  sn.begin_interval_time BETWEEN TO_DATE('11/06/2026 00:50','DD/MM/YYYY HH24:MI')
+                                  AND TO_DATE('11/06/2026 04:30','DD/MM/YYYY HH24:MI')
+GROUP  BY s.sql_id, s.plan_hash_value
+ORDER  BY elapsed_s DESC;
+
+
+SQL_ID        PLAN_HASH_VALUE      EXECS  ELAPSED_S      CPU_S   IOWAIT_S BUFFER_GETS DISK_READS  ROWS_PROC
+------------- --------------- ---------- ---------- ---------- ---------- ----------- ---------- ----------
+8kdq7660j4t6c      3919208543          2      84496       1019      83565   196856079   53015110    7218505
+
+
+
+
+SELECT h.sql_id,
+       h.instance_number              AS inst,
+       COUNT(*)                        AS ash_samples,
+       ROUND(COUNT(*) * 10 / 60, 1)    AS est_minutes,
+       COUNT(DISTINCT h.session_id)    AS sessions,
+       SUM(CASE WHEN h.session_state='ON CPU'  THEN 1 ELSE 0 END) AS cpu_samples,
+       SUM(CASE WHEN h.session_state='WAITING' THEN 1 ELSE 0 END) AS wait_samples,
+       MAX(h.event)                    AS sample_event,
+       MAX(DBMS_LOB.SUBSTR(t.sql_text,60,1)) AS sql_text
+FROM   dba_hist_active_sess_history h
+JOIN   dba_hist_snapshot sn
+       ON sn.snap_id = h.snap_id AND sn.instance_number = h.instance_number
+LEFT   JOIN dba_hist_sqltext t ON t.sql_id = h.sql_id
+WHERE (h.sample_time BETWEEN TO_TIMESTAMP('11/06/2026 01:02:05','DD/MM/YYYY HH24:MI:SS')
+                         AND TO_TIMESTAMP('11/06/2026 02:52:19','DD/MM/YYYY HH24:MI:SS')
+    OR h.sample_time BETWEEN TO_TIMESTAMP('11/06/2026 03:04:29','DD/MM/YYYY HH24:MI:SS')
+                         AND TO_TIMESTAMP('11/06/2026 04:17:40','DD/MM/YYYY HH24:MI:SS'))
+  AND  h.sql_id IS NOT NULL
+GROUP  BY h.sql_id, h.instance_number
+ORDER  BY ash_samples DESC
+FETCH  FIRST 40 ROWS ONLY;
+
+
+SQL>/
+
+SQL_ID              INST ASH_SAMPLES EST_MINUTES   SESSIONS CPU_SAMPLES WAIT_SAMPLES SAMPLE_EVENT                                                     SQL_TEXT
+------------- ---------- ----------- ----------- ---------- ----------- ------------ ---------------------------------------------------------------- ----------------------------------------------------------------------
+8kdq7660j4t6c          1        8265      1377.5         16          48         8217 gc cr block lost                                                 SELECT Saldos.Sucursal, Saldos.Producto, Saldos.Cuenta, Sald
+6j54snh063kmg          1        1542         257         35          84         1458 gc current block 2-way                                           SELECT NVL(SUM(ABS(SD.SALDO_AJUSTADO) + ABS(SD.INT_A_LIQUIDA
+01k92tntdggbm          1         744         124         23         744            0                                                                  SELECT M.ID ,M.ID_BROKER ,M.EXCHANGE ,M.MESSAGE ,M.TRIGGER_N
+gbh37znr47n5n          2         732         122          1          25          707 gc cr grant busy                                                 SELECT
+                                                                                                                                                              TIPO_CLIENTE,
+                                                                                                                                                              ID_CLIENTE,
+                                                                                                                                                              NO
+
+b4p5pwxndn335          1         696         116          7         167          529 gc current block 2-way                                           SELECT NVL(SUM(ABS(SD.SALDO_AJUSTADO) + ABS(SD.INT_A_LIQUIDA
+apzkm2n41t4st          2         649       108.2         99          43          606 read by other session                                            INSERT INTO GRL_SALDOS_DIARIOS (TZ_LOCK, SALDOS_JTS_OID, FEC
+gfv80fxgxmw56          2         552          92          1          17          535 gc current block 2-way                                           SELECT
+
+
+
+
+SELECT plan_hash_value,
+       SUM(executions_delta) execs,
+       ROUND(SUM(elapsed_time_delta)/1e6) elapsed_seg,
+       ROUND(SUM(elapsed_time_delta)/NULLIF(SUM(executions_delta),0)/1e6,3) seg_exec,
+       MIN(snap_id) snap_min,
+       MAX(snap_id) snap_max,
+       TO_CHAR(MIN(s.snap_id),'9999999') || ' a ' || TO_CHAR(MAX(s.snap_id),'9999999') range_snap
+FROM   dba_hist_sqlstat s
+WHERE  sql_id = '2dxyfk5cwpg5x'
+GROUP  BY plan_hash_value
+ORDER  BY MIN(snap_id);
