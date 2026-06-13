@@ -243,3 +243,41 @@ Mudar estatísticas de tabela/índice.
 
 Caso interessante: com OPT_PARAM em patch, você pode mudar parâmetros do otimizador só para aquela query. Tipo OPT_PARAM('optimizer_index_cost_adj' 10) para favorecer índice sem mexer no parâmetro global.
 Resumindo: patch é "como se eu pudesse colocar hints no código sem mexer no código". Útil quando o código é da aplicação e você não tem acesso.
+
+
+Para ver todos os SQL Patches do banco:
+sqlSELECT name, category, status, force_matching, sql_text, created
+FROM   dba_sql_patches
+ORDER  BY created DESC;
+Colunas relevantes:
+
+name — nome do patch
+category — DEFAULT (global) ou outra (precisa setar sqlpatch_category na sessão para casar)
+status — ENABLED ou DISABLED
+force_matching — YES significa que casa por signature ignorando literais; NO casa só por texto exato
+sql_text — texto da query alvo (preview, geralmente truncado)
+created — quando foi criado
+
+Para ver os hints armazenados em um patch específico:
+sqlSELECT comp_data
+FROM   sys.sqlobj$data
+WHERE  signature = (SELECT signature FROM dba_sql_patches WHERE name = 'patch_997_parallel');
+Esse comp_data é um XML com os hints embutidos — útil para auditoria detalhada.
+Para ver se algum patch está ativo num cursor específico (em runtime):
+sqlSELECT inst_id, sql_id, plan_hash_value, sql_patch
+FROM   gv$sql
+WHERE  sql_patch IS NOT NULL;
+Manda o resultado da primeira query — quero ver se você tem outros patches no banco que eu não saiba.
+
+Comandos úteis de administração:
+-- Listar
+SELECT name, status, force_matching FROM dba_sql_patches;
+
+-- Desabilitar sem apagar
+EXEC DBMS_SQLDIAG.ALTER_SQL_PATCH('nome', 'STATUS', 'DISABLED');
+
+-- Remover
+EXEC DBMS_SQLDIAG.DROP_SQL_PATCH('nome');
+
+-- Confirmar uso em runtime
+SELECT sql_id, sql_patch FROM v$sql WHERE sql_patch IS NOT NULL;
