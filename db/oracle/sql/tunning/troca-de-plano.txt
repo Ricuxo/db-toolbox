@@ -6,7 +6,7 @@ SQL_ID = 8kdq7660j4t6c
 
 SELECT sql_id, status, sql_plan_hash_value, sql_exec_start
 FROM   v$sql_monitor
-WHERE  sql_id = '8kdq7660j4t6c'
+WHERE  sql_id = 'a3bjqhhsmzrtj'
 ORDER  BY sql_exec_start DESC
 FETCH FIRST 5 ROWS ONLY;
 
@@ -17,7 +17,7 @@ SELECT sql_id, plan_hash_value, executions_delta,
        ROUND(elapsed_time_delta/1e6) elapsed_seg,
        ROUND(elapsed_time_delta/NULLIF(executions_delta,0)/1e6) seg_por_exec
 FROM   dba_hist_sqlstat
-WHERE  sql_id = '8kdq7660j4t6c'
+WHERE  sql_id = 'a3bjqhhsmzrtj'
 AND    snap_id > (SELECT MAX(snap_id) - 50 FROM dba_hist_snapshot)
 ORDER  BY snap_id DESC;
 
@@ -200,17 +200,46 @@ DECLARE
 BEGIN
   SELECT sql_text INTO v_sql
   FROM   dba_hist_sqltext
-  WHERE  sql_id = '2dxyfk5cwpg5x'
+  WHERE  sql_id = 'a3bjqhhsmzrtj'
   AND    rownum = 1;
 
   v_patch := DBMS_SQLDIAG.CREATE_SQL_PATCH(
     sql_text  => v_sql,
     hint_text => 'PARALLEL(8)',
-    name      => 'patch_997_parallel'
+    name      => 'teste-patch_997_parallel'
   );
   DBMS_OUTPUT.PUT_LINE('Patch criado: ' || v_patch);
 END;
 /
 
 
-EXEC DBMS_SQLDIAG.DROP_SQL_PATCH('patch_997_parallel');
+EXEC DBMS_SQLDIAG.DROP_SQL_PATCH('teste-patch_997_parallel');
+
+--- confirmar que pegou o patch
+SELECT inst_id, sql_id, plan_hash_value, sql_patch
+FROM   gv$sql
+WHERE  sql_id = 'a3bjqhhsmzrtj';
+
+Sim, exclusivamente. SQL Patch só faz uma coisa: injetar hints na query no momento do parse.
+Não força planos, não muda estatísticas, não reescreve a query. Só hints.
+O que dá pra fazer com hints (e portanto com patch):
+
+Forçar paralelismo: PARALLEL(8)
+Forçar ou impedir um índice: INDEX(t idx_name) / NO_INDEX(t idx_name)
+Forçar método de join: USE_NL, USE_HASH, USE_MERGE
+Forçar ordem de join: LEADING(t1 t2)
+Mudar comportamento do otimizador: OPT_PARAM('parameter_name' 'value')
+Desabilitar transformações: NO_QUERY_TRANSFORMATION, NO_UNNEST
+Forçar dynamic sampling: DYNAMIC_SAMPLING(t 11)
+Forçar materialização de subqueries: MATERIALIZE
+E qualquer outro hint válido do Oracle.
+
+O que NÃO dá:
+
+Forçar um plan_hash_value específico (isso é baseline).
+Ajustar cardinalidades estimadas (isso é profile).
+Mudar o texto da query (isso é Query Rewrite ou view).
+Mudar estatísticas de tabela/índice.
+
+Caso interessante: com OPT_PARAM em patch, você pode mudar parâmetros do otimizador só para aquela query. Tipo OPT_PARAM('optimizer_index_cost_adj' 10) para favorecer índice sem mexer no parâmetro global.
+Resumindo: patch é "como se eu pudesse colocar hints no código sem mexer no código". Útil quando o código é da aplicação e você não tem acesso.
