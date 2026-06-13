@@ -191,3 +191,26 @@ FROM   dba_hist_sqlstat s
 WHERE  sql_id = '2dxyfk5cwpg5x'
 GROUP  BY plan_hash_value
 ORDER  BY MIN(snap_id);
+
+
+(Oracle injeta o hint sem mexer no código):
+DECLARE
+  v_patch VARCHAR2(128);
+  v_sql   CLOB;
+BEGIN
+  SELECT sql_text INTO v_sql
+  FROM   dba_hist_sqltext
+  WHERE  sql_id = '2dxyfk5cwpg5x'
+  AND    rownum = 1;
+
+  v_patch := DBMS_SQLDIAG.CREATE_SQL_PATCH(
+    sql_text  => v_sql,
+    hint_text => 'PARALLEL(8)',
+    name      => 'patch_997_parallel'
+  );
+  DBMS_OUTPUT.PUT_LINE('Patch criado: ' || v_patch);
+END;
+/
+
+
+EXEC DBMS_SQLDIAG.DROP_SQL_PATCH('patch_997_parallel');
