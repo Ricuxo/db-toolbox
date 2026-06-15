@@ -1,3 +1,84 @@
+Query para descobrir o ofensor principal no RAC
+
+
+SELECT
+    final_blocking_instance AS blocker_inst_id,
+    final_blocking_session  AS blocker_sid,
+    COUNT(*)                AS qtd_sessoes_bloqueadas
+FROM gv$session
+WHERE final_blocking_session IS NOT NULL
+GROUP BY
+    final_blocking_instance,
+    final_blocking_session
+ORDER BY qtd_sessoes_bloqueadas DESC;
+
+Depois, pegue os detalhes do blocker
+
+SELECT
+    s.inst_id,
+    s.sid,
+    s.serial#,
+    s.username,
+    s.osuser,
+    s.machine,
+    s.program,
+    s.module,
+    s.status,
+    s.sql_id,
+    s.prev_sql_id,
+    s.event,
+    s.seconds_in_wait,
+    s.logon_time,
+    t.start_time AS transaction_start_time,
+    t.used_ublk,
+    t.used_urec
+FROM gv$session s
+LEFT JOIN gv$transaction t
+       ON t.inst_id = s.inst_id
+      AND t.ses_addr = s.saddr
+WHERE s.inst_id = &inst_id
+  AND s.sid = &sid;
+
+Query pronta para trazer blocker + quantidade de vítimas
+
+
+WITH blockers AS (
+    SELECT
+        final_blocking_instance AS inst_id,
+        final_blocking_session  AS sid,
+        COUNT(*) AS blocked_count
+    FROM gv$session
+    WHERE final_blocking_session IS NOT NULL
+    GROUP BY
+        final_blocking_instance,
+        final_blocking_session
+)
+SELECT
+    b.blocked_count,
+    s.inst_id,
+    s.sid,
+    s.serial#,
+    s.username,
+    s.osuser,
+    s.machine,
+    s.program,
+    s.module,
+    s.status,
+    s.sql_id,
+    s.prev_sql_id,
+    s.event,
+    s.seconds_in_wait,
+    s.logon_time
+FROM blockers b
+JOIN gv$session s
+  ON s.inst_id = b.inst_id
+ AND s.sid = b.sid
+ORDER BY b.blocked_count DESC;  
+
+
+
+
+
 ---entrar arvore de lock
 set pages 1000
 set lines 120
