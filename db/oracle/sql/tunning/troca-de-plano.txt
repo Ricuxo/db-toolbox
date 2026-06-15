@@ -259,12 +259,14 @@ sql_text — texto da query alvo (preview, geralmente truncado)
 created — quando foi criado
 
 Para ver os hints armazenados em um patch específico:
-sqlSELECT comp_data
+
+SELECT comp_data
 FROM   sys.sqlobj$data
 WHERE  signature = (SELECT signature FROM dba_sql_patches WHERE name = 'patch_997_parallel');
 Esse comp_data é um XML com os hints embutidos — útil para auditoria detalhada.
+
 Para ver se algum patch está ativo num cursor específico (em runtime):
-sqlSELECT inst_id, sql_id, plan_hash_value, sql_patch
+SELECT inst_id, sql_id, plan_hash_value, sql_patch
 FROM   gv$sql
 WHERE  sql_patch IS NOT NULL;
 Manda o resultado da primeira query — quero ver se você tem outros patches no banco que eu não saiba.
