@@ -11,8 +11,8 @@ db.createUser({
 
 
 db.createUser({
-    user: "psdbconmarcos",
-    pwd: "zsd9N183c##6KjKqC2m",
+    user: "psaginichollas",
+    pwd: "zsd9N183c326KjKqC2m",
     roles: [
         { role: "IPsPermitidos_users", db: "admin" },
         { role: "read", db: "transfer" }
