@@ -1,0 +1,7 @@
+---revoke role
+
+db.revokeRolesFromUser(
+  "rafaellabueno",
+  [ { role: "read", db: "pix" } ]
+)
+

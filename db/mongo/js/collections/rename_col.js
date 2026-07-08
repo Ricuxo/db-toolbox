@@ -8,7 +8,10 @@ var collections = [
   "pixdictremoveds", "pixdicts", "pixfraudmarks",
   "pixfundsrecoveries", "pixinfractions", "pixliquidationperdates",
   "pixqrcodeblockeds", "pixqrcodejwks", "pixqrcodes",
-  "pixrecurringqrcodes", "pixrefunds", "pixtimespertransactions",
+  "pixrecurringauthorizations",
+  "pixrecurringqrcodes",
+  "pixrecurringschedulings",
+  "pixrefunds", "pixtimespertransactions",
   "pixtransactionbatches", "pixtransactions"
 ];
 

@@ -2,26 +2,16 @@
 // Monitora apenas as collections PIX que estão sendo cortadas no cutover
 
 var COLLECTIONS_MONITORADAS = [
-  "accountblockrefunds",
-  "localholidays",
-  "pixaccounts",
-  "pixclaims",
-  "pixdictentries",
-  "pixdictentriestimes",
-  "pixdictremoveds",
-  "pixdicts",
-  "pixfraudmarks",
-  "pixfundsrecoveries",
-  "pixinfractions",
-  "pixliquidationperdates",
-  "pixqrcodeblockeds",
-  "pixqrcodejwks",
-  "pixqrcodes",
+  "accountblockrefunds", "localholidays", "pixaccounts",
+  "pixclaims", "pixdictentries", "pixdictentriestimes",
+  "pixdictremoveds", "pixdicts", "pixfraudmarks",
+  "pixfundsrecoveries", "pixinfractions", "pixliquidationperdates",
+  "pixqrcodeblockeds", "pixqrcodejwks", "pixqrcodes",
+  "pixrecurringauthorizations",  // ← adicionar
   "pixrecurringqrcodes",
-  "pixrefunds",
-  "pixtimespertransactions",
-  "pixtransactionbatches",
-  "pixtransactions"
+  "pixrecurringschedulings",     // ← adicionar
+  "pixrefunds", "pixtimespertransactions",
+  "pixtransactionbatches", "pixtransactions"
 ];
 
 var NODES = [
@@ -75,7 +65,5 @@ while (true) {
 
 /*
 Forma de usar
-mongosh --host 10.100.97.82 --port 27017 \
-  -u admin -p 'SENHA_RS0' --authenticationDatabase admin \
-  --eval 'load("/tmp/monitor_cutover.js")'
+mongosh --host 10.100.97.82 --port 27017 -u admin -p 'SENHA_RS0' --authenticationDatabase admin  --eval 'load("/root/migracao/monitor_cutover.js")'
 */

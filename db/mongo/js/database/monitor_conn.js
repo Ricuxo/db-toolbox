@@ -9,13 +9,16 @@ var NODES = [
 ];
 
 var COLLECTIONS_MONITORADAS = [
-  "accountblockrefunds", "localholidays", "pixaccounts",
-  "pixclaims", "pixdictentries", "pixdictentriestimes",
-  "pixdictremoveds", "pixdicts", "pixfraudmarks",
-  "pixfundsrecoveries", "pixinfractions", "pixliquidationperdates",
-  "pixqrcodeblockeds", "pixqrcodejwks", "pixqrcodes",
-  "pixrecurringqrcodes", "pixrefunds", "pixtimespertransactions",
-  "pixtransactionbatches", "pixtransactions"
+    "accountblockrefunds", "localholidays", "pixaccounts",
+    "pixclaims", "pixdictentries", "pixdictentriestimes",
+    "pixdictremoveds", "pixdicts", "pixfraudmarks",
+    "pixfundsrecoveries", "pixinfractions", "pixliquidationperdates",
+    "pixqrcodeblockeds", "pixqrcodejwks", "pixqrcodes",
+    "pixrecurringauthorizations",
+    "pixrecurringqrcodes",
+    "pixrecurringschedulings",
+    "pixrefunds", "pixtimespertransactions",
+    "pixtransactionbatches", "pixtransactions"
 ];
 
 function checkNode(node) {

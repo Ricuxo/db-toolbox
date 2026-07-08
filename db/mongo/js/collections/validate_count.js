@@ -1,4 +1,3 @@
-/*# Salva o script*/
 cat > /tmp/validate_count.js << 'EOF'
 var collections = [
   "accountblockrefunds", "localholidays", "pixaccounts",
@@ -6,24 +5,30 @@ var collections = [
   "pixdictremoveds", "pixdicts", "pixfraudmarks",
   "pixfundsrecoveries", "pixinfractions", "pixliquidationperdates",
   "pixqrcodeblockeds", "pixqrcodejwks", "pixqrcodes",
-  "pixrecurringqrcodes", "pixrefunds", "pixtimespertransactions",
+  "pixrecurringauthorizations",
+  "pixrecurringqrcodes",
+  "pixrecurringschedulings",
+  "pixrefunds", "pixtimespertransactions",
   "pixtransactionbatches", "pixtransactions"
 ];
 
-var origem = connect("mongodb://admin:SENHA_RS0@10.100.97.82:27017/admin?authSource=admin");
-var destino = connect("mongodb://admin:yhz2mtk0vcx7YAG1mbd@10.100.106.86:27017/admin?authSource=admin");
+var connOrigem  = new Mongo("mongodb://admin:topazprd@10.100.97.82:27017/?authSource=admin");
+var connDestino = new Mongo("mongodb://admin:yhz2mtk0vcx7YAG1mbd@10.100.106.86:27017/?authSource=admin");
+
+var dbOrigem  = connOrigem.getDB("transfer");
+var dbDestino = connDestino.getDB("pix");
 
 print("=== VALIDAÇÃO DE CONTAGEM ===");
 print("Collection                          | Origem    | Destino   | Status");
-print("-".repeat(75));
+print("---------------------------------------------------------------------------");
 
 var divergencias = 0;
 
 collections.forEach(c => {
-  var countOrigem  = origem.getDB("transfer")[c].countDocuments({});
-  var countDestino = destino.getDB("pix")[c].countDocuments({});
-  var status = (countOrigem === countDestino) ? "OK" : "DIVERGÊNCIA";
-  if (status === "DIVERGÊNCIA") divergencias++;
+  var countOrigem  = dbOrigem[c].countDocuments({});
+  var countDestino = dbDestino[c].countDocuments({});
+  var status = (countOrigem === countDestino) ? "OK" : "DIVERGENCIA";
+  if (status === "DIVERGENCIA") divergencias++;
   print(
     c.padEnd(35) + " | " +
     String(countOrigem).padStart(9) + " | " +
@@ -32,9 +37,9 @@ collections.forEach(c => {
   );
 });
 
-print("-".repeat(75));
-print("Divergências: " + divergencias + "/" + collections.length);
-print("Concluído: " + new Date().toISOString());
+print("---------------------------------------------------------------------------");
+print("Divergencias: " + divergencias + "/" + collections.length);
+print("Concluido: " + new Date().toISOString());
 EOF
 
-/*mongosh --host 10.100.97.82 --port 27017 -u admin -p 'SENHA_RS0' --authenticationDatabase admin /tmp/validate_count.js*/
+mongosh --host 10.100.97.82 --port 27017 -u admin -p 'topazprd' --authenticationDatabase admin /tmp/validate_count.js
