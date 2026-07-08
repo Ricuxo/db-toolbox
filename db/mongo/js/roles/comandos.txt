@@ -8,8 +8,28 @@ db.revokeRolesFromUser(
 ---grant role
 
 db.grantRolesToUser(
-  "rafaellabueno",
+  "felipe_xavier",
   [
     { role: "pixtransactions_read", db: "admin" }
   ]
 )
+
+
+---create user
+// Read no banco transfer
+db.createUser({
+  user: "marianacolombo",
+  pwd: "dfaudureubaf1HZF",
+  roles: [
+    { role: "read", db: "transfer" }
+  ]
+})
+
+// Role custom pixtransactions_read
+db.createUser({
+  user: "marianacolombo",
+  pwd: "dfaudureubaf1HZF",
+  roles: [
+    { role: "pixtransactions_read", db: "admin" }
+  ]
+})
