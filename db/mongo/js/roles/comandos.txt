@@ -5,3 +5,11 @@ db.revokeRolesFromUser(
   [ { role: "read", db: "pix" } ]
 )
 
+---grant role
+
+db.grantRolesToUser(
+  "rafaellabueno",
+  [
+    { role: "pixtransactions_read", db: "admin" }
+  ]
+)
