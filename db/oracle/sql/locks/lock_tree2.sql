@@ -26,4 +26,4 @@ and h.sid = a.sid
 and w.sid = b.sid and h.inst_id = a.inst_id
 and decode (w.type, 'TX', b.row_wait_obj#,
 'TM', w.id1)
-= o.object_id
+= o.object_id;
