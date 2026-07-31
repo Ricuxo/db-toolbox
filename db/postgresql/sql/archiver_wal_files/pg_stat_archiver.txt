@@ -1,0 +1,26 @@
+Check archiver for any errors/status:
+***************************************************************************
+SELECT * FROM pg_stat_archiver;
+
+
+Query to find pg_stat_archiver + wals per second and whether the archive is still archiving
+***************************************************************************
+SELECT *,
+    current_setting('archive_mode')::BOOLEAN
+        AND (last_failed_wal IS NULL
+            OR last_failed_wal <= last_archived_wal)
+        AS is_archiving,
+    CAST (archived_count AS NUMERIC)
+        / EXTRACT (EPOCH FROM age(now(), stats_reset))
+        AS current_archived_wals_per_second
+FROM pg_stat_archiver;
+
+
+Reset Archiver Stats:
+***************************************************************************
+SELECT pg_stat_reset_shared('archiver');
+
+
+How to switch wal files
+***************************************************************************
+Select pg_switch_wal();
