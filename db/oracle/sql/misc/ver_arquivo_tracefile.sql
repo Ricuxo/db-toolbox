@@ -1,0 +1,1 @@
+SELECT tracefile FROM v$process p, v$session s WHERE s.paddr=p.addr AND s.sid=678;
