@@ -11,11 +11,11 @@ db.createUser({
 
 
 db.createUser({
-    user: "psaginichollas",
+    user: "psdbcluciele",
     pwd: "zsd9N183c326KjKqC2m",
     roles: [
         { role: "IPsPermitidos_users", db: "admin" },
-        { role: "read", db: "transfer" }
+        { role: "read", db: "termica" }
     ],
     mechanisms: ["SCRAM-SHA-256"],
     passwordDigestor: "server"
