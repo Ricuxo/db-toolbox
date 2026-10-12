@@ -1,0 +1,109 @@
+#!/bin/sh
+#
+# loadenv       This shell script takes care of show a menu to load environment variables.
+#               It use the /etc/oratab or /var/opt/oracle/oratab file.
+#               Developed by Carlos Henrique Duarte (carlos.h.duarte@oracle.com).
+#
+# description: This script is developed with purpose to help de technical user to load
+#              the Oracle environment variables easiest.
+#
+
+function oratabNotFound
+{
+echo "Nao foi encontrado o arquivo /etc/oratab ou /var/opt/oracle/oratab"
+echo "Verifique se ha produtos Oracle instalados no servidor."
+exit 1
+}
+
+function checkOratabFile
+{
+if [ -f "/etc/oratab" ]; then
+ORATABFILE=/etc/oratab
+elif [ -f "/var/opt/oracle/oratab" ]; then
+ORATABFILE=/var/opt/oracle/oratab
+else
+ORATABFILE=""
+oratabNotFound
+fi
+}
+
+function printOracleHomes
+{
+if [[ $# -gt 0 && $1 -eq 1 ]]; then
+clear
+printf "Nao e uma opcao valida\n"
+fi
+
+echo "Oracle Homes disponiveis na maquina:"
+echo
+n=1
+totalhomes=`cat $ORATABFILE | egrep -v ^"#" | egrep -v '^$' | wc -l`
+cat $ORATABFILE | egrep -v ^"#" | egrep -v '^$' | while read i
+do
+  homename=`echo $i | cut -d ":" -f1`
+  homedir=`echo $i | cut -d ":" -f2`
+  printf "\t\t\t [$n] - [$homename] - [$homedir] \n"
+  n=`expr $n + 1`
+done
+echo
+printf "Escolha um Oracle home pelo numero: "
+read i
+let x=$i
+if [[ $x -gt $totalhomes || $x -eq 0 ]]; then
+printOracleHomes 1
+else
+loadEnvVars $i
+fi
+}
+
+function loadEnvVars
+{
+n=0
+cat $ORATABFILE | egrep -v ^"#" | egrep -v '^$' | while read i
+do
+  n=`expr $n + 1`
+  homename=`echo $i | cut -d ":" -f1`
+  homedir=`echo $i | cut -d ":" -f2`
+  if [ $n -eq $1 ]; then
+    if [ "$homename" = "*" ]; then
+      echo "*************** Carregando um Oracle Home sem nome. O Oracle sid sera atribuido para home1 ***************"
+      echo home1 > /tmp/selectedHome
+      echo $homedir >> /tmp/selectedHome
+    else
+      echo "*************** Carregando Oracle Home $homename ***************"
+      echo $homename > /tmp/selectedHome
+    fi
+  break
+  fi
+done
+}
+
+checkOratabFile
+if [ "$ORATABFILE" != "" ]; then
+clear
+echo "Utilizando Oratab - $ORATABFILE"
+printOracleHomes
+found=`cat /tmp/selectedHome | wc -l`
+if [ $found = 1 ]; then
+homename=`cat /tmp/selectedHome`
+. oraenv <<EOF
+$homename
+EOF
+else
+homename=`cat /tmp/selectedHome | head -1`
+homedir=`cat /tmp/selectedHome | tail -1`
+. oraenv <<EOF
+$homename
+$homedir
+EOF
+fi
+clear
+echo
+echo "###############################################################################"
+echo
+echo "ORACLE_SID  configurado para $ORACLE_SID"
+echo "ORACLE_HOME configurado para $ORACLE_HOME"
+echo
+echo "###############################################################################"
+echo
+fi

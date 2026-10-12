@@ -17,3 +17,26 @@ ON ips.object_id = i.object_id
    ips.index_id = i.index_id
 where avg_fragmentation_in_percent> 5
 ORDER BY page_count DESC;
+
+/*
+usar isso aqui para acompanhar o rebuild
+
+SET STATISTICS PROFILE ON
+e
+SET STATISTICS PROFILE Off 
+
+SET STATISTICS PROFILE ON
+alter index [PK__PointOfS__F329C13BD7F01E08] on [PointOfSales] rebuild with (data_compression = page, online = on,  RESUMABLE = on, fillfactor = 80, maxdop = 1)
+SET STATISTICS PROFILE off
+*/
+
+
+/*
+SELECT node_id,physical_operator_name, SUM(row_count) row_count,
+  SUM(estimate_row_count) AS estimate_row_count,
+  CAST(SUM(row_count)*100 AS float)/SUM(estimate_row_count)  percent_completed
+FROM sys.dm_exec_query_profiles  
+WHERE session_id= (colocar o SPID da conexão que quer monitorar)
+GROUP BY node_id,physical_operator_name 
+ORDER BY node_id;
+*/
