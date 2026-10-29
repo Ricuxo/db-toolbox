@@ -11,3 +11,8 @@ db.createUser({
     { role: "read", db: "tpz-core-people" }
   ]
 })
+
+
+/* reset user password */
+
+db.getSiblingDB("admin").changeUserPassword("nome_do_usuario", passwordPrompt())
