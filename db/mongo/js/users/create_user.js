@@ -24,7 +24,7 @@ db.createUser({
 
 
 // Executar no mongosh - Mais proximo de um DDL
-var u = db.getUser("db_app_admin", {
+var u = db.getUser("app_pix", {
     showPrivileges: false,
     showCredentials: false,
     showAuthenticationRestrictions: true
