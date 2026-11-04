@@ -4,6 +4,8 @@
 --
 -- SOMENTE LEITURA: nenhum comando altera o banco.
 -- Execucao : sqlplus / as sysdba @check_auditoria.sql
+--            (requer SYSDBA: le SYS.AUD$ e views DBA_*; com usuario nominal
+--             a secao 1 pode falhar por falta de privilegio)
 -- RAC      : rodar em apenas um no.
 -- CDB      : rodar em cada PDB (ALTER SESSION SET CONTAINER = <pdb>).
 -- Saida    : check_auditoria_<DB>_<data>.log no diretorio corrente.
@@ -13,7 +15,7 @@ SET LINESIZE 250 PAGESIZE 200 FEEDBACK OFF VERIFY OFF TRIMSPOOL ON TAB OFF
 SET LONG 4000
 
 COLUMN spool_name NEW_VALUE v_spool NOPRINT
-SELECT 'check_auditoria_' || name || '_' || SYS_CONTEXT('USERENV', 'CON_NAME')
+SELECT 'check_auditoria_' || name || '_' || REPLACE(SYS_CONTEXT('USERENV', 'CON_NAME'), '$', '_')
        || '_' || TO_CHAR(SYSDATE, 'YYYYMMDD_HH24MI') || '.log' AS spool_name
 FROM   v$database;
 SPOOL &v_spool
@@ -57,7 +59,7 @@ COLUMN detalhe     FORMAT A120 WORD_WRAPPED
 SELECT 10 AS ordem,
        'Corte UNIFIED definido e recente'                                AS verificacao,
        CASE WHEN COUNT(*) = 0 THEN 'ALERTA'
-            WHEN MAX(last_archive_ts) < SYSTIMESTAMP - INTERVAL '120' DAY THEN 'ALERTA'
+            WHEN MAX(last_archive_ts) < SYSTIMESTAMP - INTERVAL '120' DAY(3) THEN 'ALERTA'
             ELSE 'OK' END                                                AS status,
        NVL(TO_CHAR(MAX(last_archive_ts), 'YYYY-MM-DD HH24:MI:SS TZR'),
            'nao definido - purge do UNIFIED nunca apaga nada')           AS detalhe
@@ -67,12 +69,24 @@ UNION ALL
 -- Corte do STANDARD
 SELECT 11,
        'Corte STANDARD definido e recente',
-       CASE WHEN COUNT(*) = 0 THEN 'ALERTA'
-            WHEN MAX(last_archive_ts) < SYSTIMESTAMP - INTERVAL '120' DAY THEN 'ALERTA'
+       CASE WHEN a.qtd = 0 AND t.uso = 0 THEN 'N/A'
+            WHEN a.qtd = 0 THEN 'ALERTA'
+            WHEN a.mx < SYSTIMESTAMP - INTERVAL '120' DAY(3) THEN 'ALERTA'
             ELSE 'OK' END,
-       NVL(TO_CHAR(MAX(last_archive_ts), 'YYYY-MM-DD HH24:MI:SS TZR'), 'nao definido')
-FROM   dba_audit_mgmt_last_arch_ts
-WHERE  audit_trail = 'STANDARD AUDIT TRAIL'
+       CASE WHEN a.qtd = 0 AND t.uso = 0
+            THEN 'trilha tradicional sem uso (AUD$ vazio, sem AUDIT/FGA ativos)'
+            ELSE NVL(TO_CHAR(a.mx, 'YYYY-MM-DD HH24:MI:SS TZR'), 'nao definido') END
+FROM  (SELECT COUNT(*) AS qtd, MAX(last_archive_ts) AS mx
+       FROM   dba_audit_mgmt_last_arch_ts
+       WHERE  audit_trail = 'STANDARD AUDIT TRAIL') a,
+      (SELECT (SELECT COUNT(*) FROM dba_stmt_audit_opts)
+            + (SELECT COUNT(*) FROM dba_priv_audit_opts)
+            + (SELECT COUNT(*) FROM dba_obj_audit_opts o
+               WHERE o.owner NOT IN (SELECT username FROM dba_users
+                                     WHERE  oracle_maintained = 'Y'))
+            + (SELECT COUNT(*) FROM dba_audit_policies)
+            + (SELECT COUNT(*) FROM sys.aud$ WHERE ROWNUM = 1) AS uso
+       FROM dual) t
 UNION ALL
 -- Job de purge cobrindo o UNIFIED
 SELECT 20,
@@ -86,11 +100,22 @@ UNION ALL
 -- Job de purge cobrindo STD/FGA
 SELECT 21,
        'Job de purge do STANDARD/FGA ativo',
-       CASE WHEN COUNT(*) = 0 THEN 'ALERTA' ELSE 'OK' END,
-       COUNT(*) || ' job(s) ENABLED no DBMS_AUDIT_MGMT'
-FROM   dba_audit_mgmt_cleanup_jobs
-WHERE  job_status = 'ENABLED'
-AND   (audit_trail LIKE '%STANDARD%' OR audit_trail LIKE 'ALL%')
+       CASE WHEN a.qtd > 0 THEN 'OK'
+            WHEN t.uso = 0 THEN 'N/A'
+            ELSE 'ALERTA' END,
+       a.qtd || ' job(s) ENABLED no DBMS_AUDIT_MGMT'
+FROM  (SELECT COUNT(*) AS qtd
+       FROM   dba_audit_mgmt_cleanup_jobs
+       WHERE  job_status = 'ENABLED'
+       AND   (audit_trail LIKE '%STANDARD%' OR audit_trail LIKE 'ALL%')) a,
+      (SELECT (SELECT COUNT(*) FROM dba_stmt_audit_opts)
+            + (SELECT COUNT(*) FROM dba_priv_audit_opts)
+            + (SELECT COUNT(*) FROM dba_obj_audit_opts o
+               WHERE o.owner NOT IN (SELECT username FROM dba_users
+                                     WHERE  oracle_maintained = 'Y'))
+            + (SELECT COUNT(*) FROM dba_audit_policies)
+            + (SELECT COUNT(*) FROM sys.aud$ WHERE ROWNUM = 1) AS uso
+       FROM dual) t
 UNION ALL
 -- Metadado do DBMS_AUDIT_MGMT x scheduler (caso do job sobrescrito manualmente)
 SELECT 22,
@@ -357,7 +382,11 @@ SELECT 'STATEMENT' AS tipo, COUNT(*) AS qtd FROM dba_stmt_audit_opts
 UNION ALL
 SELECT 'PRIVILEGE',         COUNT(*)        FROM dba_priv_audit_opts
 UNION ALL
-SELECT 'OBJECT',            COUNT(*)        FROM dba_obj_audit_opts;
+SELECT 'OBJECT (aplicacao)', COUNT(*)       FROM dba_obj_audit_opts
+WHERE  owner NOT IN (SELECT username FROM dba_users WHERE oracle_maintained = 'Y')
+UNION ALL
+SELECT 'OBJECT (Oracle)',    COUNT(*)       FROM dba_obj_audit_opts
+WHERE  owner IN (SELECT username FROM dba_users WHERE oracle_maintained = 'Y');
 
 COLUMN user_name   FORMAT A20
 COLUMN audit_option FORMAT A35
