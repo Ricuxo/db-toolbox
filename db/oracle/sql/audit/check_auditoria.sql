@@ -13,7 +13,8 @@ SET LINESIZE 250 PAGESIZE 200 FEEDBACK OFF VERIFY OFF TRIMSPOOL ON TAB OFF
 SET LONG 4000
 
 COLUMN spool_name NEW_VALUE v_spool NOPRINT
-SELECT 'check_auditoria_' || name || '_' || TO_CHAR(SYSDATE, 'YYYYMMDD_HH24MI') || '.log' AS spool_name
+SELECT 'check_auditoria_' || name || '_' || SYS_CONTEXT('USERENV', 'CON_NAME')
+       || '_' || TO_CHAR(SYSDATE, 'YYYYMMDD_HH24MI') || '.log' AS spool_name
 FROM   v$database;
 SPOOL &v_spool
 
@@ -30,7 +31,9 @@ COLUMN unified_puro    FORMAT A12
 COLUMN audit_trail     FORMAT A15
 COLUMN audit_sys_ops   FORMAT A13
 COLUMN cdb             FORMAT A4
+COLUMN container       FORMAT A15
 SELECT d.name,
+       SYS_CONTEXT('USERENV', 'CON_NAME') AS container,
        d.db_unique_name,
        d.database_role,
        i.host_name,
@@ -269,7 +272,6 @@ PROMPT =========================================================================
 COLUMN status       FORMAT A12
 COLUMN actual_start FORMAT A30
 COLUMN run_duration FORMAT A20
-COLUMN error#       FORMAT 999999
 SELECT owner, job_name, status,
        TO_CHAR(actual_start_date, 'YYYY-MM-DD HH24:MI TZR') AS actual_start,
        TO_CHAR(run_duration)                                 AS run_duration,
