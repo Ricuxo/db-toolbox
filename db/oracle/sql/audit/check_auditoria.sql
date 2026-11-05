@@ -130,8 +130,28 @@ WHERE  NOT EXISTS (
          FROM   dba_scheduler_jobs s
          WHERE  s.job_name = c.job_name
          AND    s.owner IN ('AUDSYS', 'SYS')
+         -- acao gerada pelo CREATE_PURGE_JOB: CLEAN_AUDIT_TRAIL(<numero>, ...)
+         -- job recriado manualmente (parametros nomeados) nao casa
+         AND    REGEXP_LIKE(s.job_action,
+                            'DBMS_AUDIT_MGMT\.CLEAN_AUDIT_TRAIL\(\s*[0-9]+\s*,', 'i')
          AND  ((c.job_status = 'ENABLED'  AND s.enabled = 'TRUE')
             OR (c.job_status = 'DISABLED' AND s.enabled = 'FALSE')))
+UNION ALL
+-- Linha de corte orfa: GUID zerado (heranca de nao-CDB) ao lado de linha com GUID.
+-- O purge passa a usar a linha antiga e nao apaga nada.
+SELECT 23,
+       'Corte sem linha orfa (GUID zerado)',
+       CASE WHEN COUNT(*) = 0 THEN 'OK' ELSE 'ALERTA' END,
+       NVL(LISTAGG(o.audit_trail || ' ' || TO_CHAR(o.last_archive_ts, 'YYYY-MM-DD')
+                   || ' dbid=' || o.database_id, ', ')
+             WITHIN GROUP (ORDER BY o.audit_trail),
+           'nenhuma')
+FROM   dba_audit_mgmt_last_arch_ts o
+WHERE  o.container_guid = '00000000000000000000000000000000'
+AND    EXISTS (SELECT 1
+               FROM   dba_audit_mgmt_last_arch_ts n
+               WHERE  n.audit_trail     = o.audit_trail
+               AND    n.container_guid <> '00000000000000000000000000000000')
 UNION ALL
 -- Politicas ORA_* de baseline
 SELECT 30,
