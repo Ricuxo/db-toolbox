@@ -1,0 +1,165 @@
+---
+# Fase 70 — HugePages para o SGA e USE_LARGE_PAGES.
+# Fontes: 19c ladbi "Configuring HugePages on Linux" (configurar DEPOIS de criar os bancos; valor em
+# /etc/sysctl.d/99-nr_hugepages.conf; memlock ≥ 90% da RAM; ≤ 70% da RAM em HugePages; reiniciar as
+# instâncias); 19c Reference USE_LARGE_PAGES (ONLY: "the instance will fail to start if large pages
+# cannot be used for the entire SGA memory"; recomendado).
+# Cálculo: soma, por segmento, da memória compartilhada da instância (sysresv + ipcs, arredondando
+# para cima) + ora_hugepages_extra. A doc remete ao script da MOS 401749.1 e não traz fórmula (NÃO
+# VERIFICADO na doc); a prova é a instância subindo com ONLY. O ASM usa AMM (memory_target) e fica
+# fora da conta; a margem cobre o segmento pequeno dele se ocupar HugePages ao subir primeiro.
+
+- name: HugePages | Ambiente do banco
+  ansible.builtin.set_fact:
+    _hp_env:
+      ORACLE_HOME: "{{ ora_db_home }}"
+      ORACLE_BASE: "{{ ora_base }}"
+      ORACLE_SID: "{{ ora_db_name }}"
+
+# ---------- Pré-condições (somente leitura) ----------
+- name: HugePages | Banco no ar (fase 60)
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl status database -db {{ ora_db_name }}"
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _hp_dbstatus
+  changed_when: false
+  check_mode: false
+  failed_when: _hp_dbstatus.rc != 0 or 'is running' not in _hp_dbstatus.stdout
+
+- name: HugePages | Estado inicial
+  ansible.builtin.include_tasks: state.yml
+
+- name: HugePages | Páginas necessárias
+  ansible.builtin.set_fact:
+    _hp_needed: "{{ _hp.shm_pages | int + (ora_hugepages_extra | int) }}"
+
+- name: HugePages | Pré-requisitos da doc
+  ansible.builtin.assert:
+    that:
+      - _hp.memory_target | int == 0
+      - (_hp_needed | int) * (_hp.page_kb | int) <= (_hp.mem_total_kb | int) * (ora_hugepages_max_pct | int) / 100
+    fail_msg: >-
+      {{ 'memory_target <> 0 (AMM é incompatível com HugePages/USE_LARGE_PAGES=ONLY). '
+         if _hp.memory_target | int != 0 else '' }}{{ _hp_needed }} páginas de {{ _hp.page_kb }} kB passam de
+      {{ ora_hugepages_max_pct }}% da RAM ({{ _hp.mem_total_kb }} kB): reduza o SGA.
+    quiet: true
+
+- name: HugePages | memlock do dono (sessão nova) e grupo do hugetlb
+  ansible.builtin.shell: |
+    set -o pipefail
+    echo "MEMLOCK=$(su - {{ ora_owner }} -c 'ulimit -l')"
+    echo "SHM_GROUP=$(sysctl -n vm.hugetlb_shm_group)"
+    echo "OWNER_GID=$(id -g {{ ora_owner }})"
+  register: _hp_limits
+  changed_when: false
+  check_mode: false
+
+- name: HugePages | memlock ≥ 90% da RAM e vm.hugetlb_shm_group = gid do dono
+  vars:
+    _l: "{{ dict(_hp_limits.stdout_lines | map('split', '=', 1) | list) }}"
+  ansible.builtin.assert:
+    that:
+      - _l.MEMLOCK == 'unlimited' or (_l.MEMLOCK | int) >= (_hp.mem_total_kb | int) * 0.9
+      - _l.SHM_GROUP == _l.OWNER_GID
+    fail_msg: "memlock={{ _l.MEMLOCK }} kB (mínimo {{ ((_hp.mem_total_kb | int) * 0.9) | int }}), vm.hugetlb_shm_group={{ _l.SHM_GROUP }} (esperado {{ _l.OWNER_GID }}). Corrija na preparação do host."
+    quiet: true
+
+# ---------- Configuração ----------
+- name: HugePages | vm.nr_hugepages
+  ansible.posix.sysctl:
+    name: vm.nr_hugepages
+    value: "{{ _hp_needed }}"
+    sysctl_file: "{{ ora_hugepages_sysctl_file }}"
+    sysctl_set: true
+    reload: true
+
+- name: HugePages | Fim do --check antes de reiniciar o banco
+  ansible.builtin.meta: end_host
+  when: ansible_check_mode
+
+- name: HugePages | Estado depois do sysctl
+  ansible.builtin.include_tasks: state.yml
+
+# Doc: "If you cannot set your HugePages allocation using nr_hugepages, then your available memory may
+# be fragmented. Restart your server for the Hugepages allocation to take effect."
+- name: HugePages | Kernel alocou as páginas
+  ansible.builtin.assert:
+    that: _hp.total | int == _hp_needed | int
+    fail_msg: >-
+      O kernel alocou {{ _hp.total }} de {{ _hp_needed }} HugePages (memória fragmentada, segundo a doc).
+      O valor já está em {{ ora_hugepages_sysctl_file }}: reinicie o servidor em janela e rode a fase de novo.
+    quiet: true
+
+- name: HugePages | Reiniciar para o SGA ir para HugePages
+  ansible.builtin.include_tasks: restart.yml
+  vars:
+    _hp_reason: SGA fora de HugePages
+  when: not (_hp_sga_ok | bool)
+
+- name: HugePages | SGA inteiro em HugePages
+  ansible.builtin.assert:
+    that: _hp_sga_ok | bool
+    fail_msg: >-
+      SGA fora de HugePages com use_large_pages={{ _hp.ulp_mem }}: alert log {{ _hp.alert_allocated }} de
+      {{ _hp.alert_expected }} páginas, erro {{ _hp.alert_error }}; em uso {{ _hp.committed }} de {{ _hp.shm_pages }}.
+      USE_LARGE_PAGES não foi alterado.
+    quiet: true
+
+- name: HugePages | USE_LARGE_PAGES={{ ora_db_use_large_pages }} no spfile
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      whenever sqlerror exit failure
+      alter system set use_large_pages={{ ora_db_use_large_pages }} scope=spfile;
+      exit
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  when: _hp.ulp_spfile != ora_db_use_large_pages
+
+- name: HugePages | Reiniciar para valer o USE_LARGE_PAGES
+  ansible.builtin.include_tasks: restart.yml
+  vars:
+    _hp_reason: USE_LARGE_PAGES={{ ora_db_use_large_pages }}
+  when: _hp.ulp_mem != ora_db_use_large_pages
+
+# ---------- Pós-checagem ----------
+- name: HugePages | Banco com o parâmetro e o SGA em HugePages
+  ansible.builtin.assert:
+    that:
+      - _hp.ulp_mem == ora_db_use_large_pages
+      - _hp.committed | int >= _hp.shm_pages | int
+    fail_msg: "use_large_pages={{ _hp.ulp_mem }}, {{ _hp.committed }}/{{ _hp.shm_pages }} páginas do SGA em HugePages."
+    quiet: true
+
+# Serviços AUTOMATIC sobem com o banco e reabrem as PDBs (fase 65; Multitenant Guide 19c).
+- name: HugePages | Serviços e PDBs depois do reinício
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      set heading off feedback off pagesize 0 linesize 200
+      select 'SVC='||lower(s.name)||'|'||upper(p.name)||'|'||p.open_mode
+        from v$active_services s join v$pdbs p on p.con_id = s.con_id;
+      exit
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _hp_svc
+  changed_when: false
+
+- name: HugePages | Serviços ativos com as PDBs em READ WRITE
+  ansible.builtin.assert:
+    that: ('SVC=' ~ (item.name | lower) ~ '|' ~ (item.pdb | upper) ~ '|READ WRITE') in _hp_svc.stdout_lines
+    fail_msg: "Serviço {{ item.name }} / PDB {{ item.pdb }} fora do esperado depois do reinício: {{ _hp_svc.stdout_lines }}"
+    quiet: true
+  loop: "{{ ora_db_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: HugePages | Resumo
+  ansible.builtin.debug:
+    msg:
+      - "vm.nr_hugepages={{ _hp.total }} ({{ _hp.page_kb }} kB); instância {{ _hp.shm_pages }} páginas; em uso {{ _hp.committed }}"
+      - "use_large_pages={{ _hp.ulp_mem }}"
+      - "{{ _hp_svc.stdout_lines }}"

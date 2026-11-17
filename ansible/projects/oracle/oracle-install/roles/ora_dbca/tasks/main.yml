@@ -1,0 +1,258 @@
+---
+# Fase 60 — criação do banco (CDB + PDB) com dbca silencioso, em ASM, num servidor com Oracle Restart.
+# Fontes: 19c Administrator's Guide cap. 2 §2.14 "Database Configuration Assistant Command Reference
+# for Silent Mode" (createDatabase: -responseFile, -enableArchive, -recoveryAreaSize,
+# -redoLogFileSize) e cap. 4 §4.1.5 ("DBCA automatically adds the database to the Oracle Restart
+# configuration"); template oficial assistants/dbca/dbca.rsp (19.3).
+# Sem bypass: nunca -ignorePrereqFailure.
+
+- name: dbca | Ambiente do banco e do ASM
+  ansible.builtin.set_fact:
+    _dbca_env_db:
+      ORACLE_HOME: "{{ ora_db_home }}"
+      ORACLE_BASE: "{{ ora_base }}"
+      ORACLE_SID: "{{ ora_db_name }}"
+    _dbca_env_asm:
+      ORACLE_HOME: "{{ ora_grid_home }}"
+      ORACLE_BASE: "{{ ora_base }}"
+      ORACLE_SID: "+ASM"
+
+# ---------- Pré-condições (somente leitura) ----------
+# O rsp com senha fica em /tmp e é apagado no always a partir do controller; se o controller morre,
+# a próxima execução o remove antes de qualquer checagem que possa abortar (como na fase 40).
+- name: dbca | Response files de execuções interrompidas
+  ansible.builtin.find:
+    paths: /tmp
+    patterns: "ora_dbca_*"
+    file_type: directory
+  register: _dbca_stale_rsp
+
+- name: dbca | Apagar response files antigos (contêm senha)
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ _dbca_stale_rsp.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: dbca | AVISO — response file antigo encontrado e apagado
+  ansible.builtin.debug:
+    msg: "Execução anterior interrompida deixou {{ _dbca_stale_rsp.files | map(attribute='path') | join(', ') }} (apagado)."
+  when: _dbca_stale_rsp.files | length > 0
+
+- name: dbca | dbca em execução
+  ansible.builtin.command: pgrep -u {{ ora_owner }} -f 'oracle\.assistants\.dbca'
+  register: _dbca_running
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# Sinais de banco existente ou de tentativa anterior (a fase só cria; limpeza é decisão do DBA,
+# com dbca -deleteDatabase).
+- name: dbca | Banco no oratab
+  ansible.builtin.command: grep -E '^{{ ora_db_name }}:' /etc/oratab
+  register: _dbca_oratab
+  changed_when: false
+  failed_when: _dbca_oratab.rc > 1
+  check_mode: false
+
+- name: dbca | Banco no Oracle Restart
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl config database -db {{ ora_db_name }}"
+  environment: "{{ _dbca_env_db }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dbca_srvctl
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# Pela linha de comando: o Oracle grava o comm em minúsculas (ora_pmon_orcl), e pgrep -x usa o comm.
+- name: dbca | Instância no ar
+  ansible.builtin.command:
+    argv: [pgrep, -f, "^ora_pmon_{{ ora_db_name }}( |$)"]
+  register: _dbca_pmon
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: dbca | Arquivos do banco no ASM
+  ansible.builtin.command: "{{ ora_grid_home }}/bin/asmcmd ls -d +{{ ora_db_diskgroup }}/{{ ora_db_name | upper }}"
+  environment: "{{ _dbca_env_asm }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dbca_asmdir
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: dbca | Logs de tentativa anterior do dbca
+  ansible.builtin.stat:
+    path: "{{ ora_base }}/cfgtoollogs/dbca/{{ ora_db_name }}"
+  register: _dbca_logdir
+
+- name: dbca | Abortar se o banco já existir ou houver tentativa anterior
+  vars:
+    _found: >-
+      {{ (['/etc/oratab'] if _dbca_oratab.rc == 0 else [])
+         + (['Oracle Restart (srvctl config database)'] if _dbca_srvctl.rc == 0 else [])
+         + (['processo ora_pmon_' ~ ora_db_name] if _dbca_pmon.rc == 0 else [])
+         + (['+' ~ ora_db_diskgroup ~ '/' ~ (ora_db_name | upper)] if _dbca_asmdir.rc == 0 else [])
+         + ([_dbca_logdir.stat.path] if _dbca_logdir.stat.exists else []) }}
+  ansible.builtin.assert:
+    that:
+      - _dbca_running.rc != 0
+      - _found | length == 0
+    fail_msg: >-
+      Esta fase só cria um banco que não existe.
+      {{ ('dbca em execução: ' ~ (_dbca_running.stdout_lines | join('; ')) ~ '.') if _dbca_running.rc == 0 else '' }}
+      {{ ('Encontrado ' ~ ora_db_name ~ ' em: ' ~ (_found | join(', ')) ~ '. Confira e, se for sobra de
+          tentativa, remova com dbca -silent -deleteDatabase antes de rodar de novo.') if _found else '' }}
+    quiet: true
+
+- name: dbca | Software do banco instalado (fase 50)
+  ansible.builtin.stat:
+    path: "{{ ora_db_home }}/bin/dbca"
+  register: _dbca_bin
+
+- name: dbca | Falta o software do banco
+  ansible.builtin.assert:
+    that: _dbca_bin.stat.exists
+    fail_msg: "{{ ora_db_home }}/bin/dbca não existe: rode a fase 50."
+    quiet: true
+
+- name: dbca | Diskgroups montados no Restart
+  ansible.builtin.command: "{{ ora_grid_home }}/bin/crsctl stat res ora.{{ item }}.dg"
+  loop: "{{ [ora_db_diskgroup, ora_db_fra_diskgroup] | unique }}"
+  register: _dbca_dg
+  changed_when: false
+  check_mode: false
+  failed_when: _dbca_dg.rc != 0 or 'STATE=ONLINE' not in _dbca_dg.stdout
+
+- name: dbca | Senhas do Vault presentes
+  ansible.builtin.assert:
+    that:
+      - vault_ora_sys_password | default('') | trim | length > 0
+      - vault_ora_system_password | default('') | trim | length > 0
+      - vault_ora_pdbadmin_password | default('') | trim | length > 0
+    fail_msg: "vault_ora_sys_password, vault_ora_system_password e vault_ora_pdbadmin_password são obrigatórias e não podem ser só espaço ou quebra de linha (vault.yml)."
+    quiet: true
+  no_log: true
+
+# A criação não tem como ser simulada; em --check a fase termina aqui.
+- name: dbca | Fim do --check antes de criar o banco
+  ansible.builtin.meta: end_host
+  when: ansible_check_mode
+
+# ---------- Criação ----------
+- name: dbca | Criação do banco
+  block:
+    - name: dbca | Diretório temporário do response file
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: ora_dbca_
+      register: _dbca_tmp
+
+    - name: dbca | Diretório temporário só do dono
+      ansible.builtin.file:
+        path: "{{ _dbca_tmp.path }}"
+        owner: "{{ ora_owner }}"
+        group: "{{ ora_install_group }}"
+        mode: "0700"
+
+    - name: dbca | Response file (0600, dono {{ ora_owner }})
+      ansible.builtin.template:
+        src: dbca.rsp.j2
+        dest: "{{ _dbca_tmp.path }}/dbca.rsp"
+        owner: "{{ ora_owner }}"
+        group: "{{ ora_install_group }}"
+        mode: "0600"
+      no_log: true
+
+    - name: dbca | dbca -silent -createDatabase (pode levar mais de 30 min)
+      ansible.builtin.command:
+        argv:
+          - "{{ ora_db_home }}/bin/dbca"
+          - -silent
+          - -createDatabase
+          - -responseFile
+          - "{{ _dbca_tmp.path }}/dbca.rsp"
+          - -enableArchive
+          - "{{ ora_db_archivelog | string | lower }}"
+          - -recoveryAreaSize
+          - "{{ ora_db_fra_size_mb }}"
+          - -redoLogFileSize
+          - "{{ ora_db_redo_size_mb }}"
+      environment: "{{ _dbca_env_db }}"
+      become: true
+      become_user: "{{ ora_owner }}"
+      async: 10800
+      poll: 60
+      register: _dbca_run
+      # Saída sem senha (as senhas só estão no rsp). Falha com rc != 0, [FATAL] ou qualquer
+      # [WARNING] [DBT-nnnnn] fora de ora_dbca_accept_warnings (vazio por padrão).
+      failed_when: >-
+        _dbca_run.rc != 0 or '[FATAL]' in _dbca_run.stdout or
+        (_dbca_run.stdout | regex_findall('\\[WARNING\\] \\[(DBT-[0-9]+)\\]')
+         | difference(ora_dbca_accept_warnings) | length > 0)
+
+  always:
+    - name: dbca | Apagar o response file
+      ansible.builtin.file:
+        path: "{{ _dbca_tmp.path }}"
+        state: absent
+      when: _dbca_tmp.path is defined
+
+# ---------- Pós-checagem ----------
+- name: dbca | Registro no Oracle Restart
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl status database -db {{ ora_db_name }}"
+  environment: "{{ _dbca_env_db }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dbca_status
+  changed_when: false
+  failed_when: _dbca_status.rc != 0 or 'is running' not in _dbca_status.stdout
+
+- name: dbca | Configuração efetiva do banco
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      set heading off feedback off pagesize 0 linesize 200 trimspool on
+      select 'LOG_MODE='||log_mode from v$database;
+      select 'CHARSET='||value from nls_database_parameters where parameter='NLS_CHARACTERSET';
+      select 'PDB='||open_mode from v$pdbs where name=upper('{{ ora_pdb_name }}');
+      select 'MEMORY_TARGET='||value from v$parameter where name='memory_target';
+      select 'SGA_TARGET='||value from v$parameter where name='sga_target';
+      select 'PGA_TARGET='||value from v$parameter where name='pga_aggregate_target';
+      select 'FRA_DEST='||value from v$parameter where name='db_recovery_file_dest';
+      select 'FRA_SIZE='||value from v$parameter where name='db_recovery_file_dest_size';
+      select 'REDO_MB='||min(bytes)/1048576||'/'||max(bytes)/1048576 from v$log;
+      select 'SQLPATCH='||patch_id||' '||action||' '||status||' '||description from dba_registry_sqlpatch order by action_time;
+      exit
+  environment: "{{ _dbca_env_db }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dbca_sql
+  changed_when: false
+
+- name: dbca | Valores conferidos
+  vars:
+    _v: >-
+      {{ dict(_dbca_sql.stdout_lines | select('search', '^[A-Z_]+=') | reject('match', '^SQLPATCH=')
+              | map('split', '=', 1) | list) }}
+  ansible.builtin.assert:
+    that:
+      - _v.LOG_MODE == ('ARCHIVELOG' if ora_db_archivelog else 'NOARCHIVELOG')
+      - _v.CHARSET == ora_db_charset
+      - _v.PDB == 'READ WRITE'
+      - _v.MEMORY_TARGET == '0'
+      - _v.SGA_TARGET | int > 0
+      - _v.FRA_DEST == '+' ~ ora_db_fra_diskgroup
+      - _v.FRA_SIZE | int == ora_db_fra_size_mb * 1048576
+      - _v.REDO_MB == (ora_db_redo_size_mb ~ '/' ~ ora_db_redo_size_mb)
+    fail_msg: "Banco criado, mas diferente do pedido: {{ _v }}"
+    quiet: true
+
+# datapatch: a doc 19c lida não diz se o dbca o roda num home com RU. Fica registrado para o DBA.
+- name: dbca | Resumo (inclui dba_registry_sqlpatch)
+  ansible.builtin.debug:
+    msg: "{{ _dbca_status.stdout_lines + _dbca_sql.stdout_lines }}"

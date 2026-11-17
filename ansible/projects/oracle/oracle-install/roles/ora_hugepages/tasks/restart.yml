@@ -1,0 +1,17 @@
+---
+# Reinício do banco pelo Oracle Restart (19c Admin Guide cap. 4: srvctl stop/start database).
+# Os serviços com policy AUTOMATIC sobem junto e reabrem as PDBs (fase 65).
+- name: HugePages | Parar o banco ({{ _hp_reason }})
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl stop database -db {{ ora_db_name }} -stopoption IMMEDIATE"
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+
+- name: HugePages | Subir o banco
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl start database -db {{ ora_db_name }}"
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+
+- name: HugePages | Estado depois do reinício
+  ansible.builtin.include_tasks: state.yml

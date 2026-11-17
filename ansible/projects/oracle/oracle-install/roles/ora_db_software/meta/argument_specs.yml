@@ -1,0 +1,30 @@
+---
+argument_specs:
+  main:
+    short_description: Instala o software Oracle Database 19c (só software) num servidor com Oracle Restart.
+    description:
+      - runInstaller silencioso com -applyRU (GIRU) e -applyOneOffs; nunca -ignorePrereq.
+      - Exige o Grid (Restart) instalado; aborta com instalador rodando, DB home no inventário ou
+        patch desta instalação já aplicado no home.
+      - Apaga response files de execuções interrompidas (/tmp/ora_db_sw_*) antes de começar.
+      - Response file 0600, dono oracle, apagado ao fim.
+    options:
+      ora_version: {type: str, required: true}
+      ora_ru: {type: str, required: true}
+      ora_owner: {type: str, required: true}
+      ora_install_group: {type: str, required: true}
+      ora_base: {type: path, required: true}
+      ora_inventory_dir: {type: path, required: true}
+      ora_stage_dir: {type: path, required: true}
+      ora_stage_patch_dir: {type: path, required: true}
+      ora_media: {type: dict, required: true}
+      ora_db_home: {type: path}
+      ora_db_edition: {type: str, choices: [EE, SE2]}
+      ora_db_osdba: {type: str}
+      ora_db_osoper: {type: str}
+      ora_db_osbackupdba: {type: str}
+      ora_db_osdgdba: {type: str}
+      ora_db_oskmdba: {type: str}
+      ora_db_osracdba: {type: str}
+      ora_db_opatch_min: {type: str}
+      ora_db_accept_warnings: {type: list, elements: str}

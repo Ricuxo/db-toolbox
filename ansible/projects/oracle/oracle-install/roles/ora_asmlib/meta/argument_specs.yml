@@ -1,0 +1,14 @@
+---
+argument_specs:
+  main:
+    short_description: Instala e configura o ASMLib v3 e marca os discos de ora_asm.
+    description:
+      - Só aceita disco por /dev/disk/by-id/. Só particiona disco vazio (sem partição nem assinatura).
+      - Nunca reescreve partição com conteúdo nem troca label de disco ASM existente.
+    options:
+      ora_owner: {type: str, required: true}
+      ora_stage_dir: {type: path, required: true}
+      ora_media: {type: dict, required: true}
+      ora_asm: {type: dict, required: true}
+      ora_asmlib_group: {type: str}
+      ora_asmlib_repo: {type: str}

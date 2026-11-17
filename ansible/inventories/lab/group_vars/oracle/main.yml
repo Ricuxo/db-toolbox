@@ -1,0 +1,25 @@
+---
+# Padrões dos servidores Oracle deste ambiente (grupo "oracle"). Valores de um servidor só vão em
+# host_vars/<host>.yml. O que é só da instalação (RU alvo, catálogo da mídia) fica no projeto
+# oracle-install, em playbooks/group_vars/all/.
+
+# Dono único do software (Database e Grid). Separação de papéis não é usada na casa.
+ora_owner: oracle
+ora_install_group: oinstall
+
+# Layout OFA
+ora_app_dir: /u01/app
+ora_base: /u01/app/oracle
+ora_inventory_dir: /u01/app/oraInventory
+
+# Homes OFA de servidor standalone com dono único oracle (usados por mais de uma fase).
+# 19c ladbi, "Optimal Flexible Architecture File Path Examples" e "Oracle Home Directory Naming
+# Convention": /u01/app/oracle/product/19.0.0/grid e .../dbhome_1.
+ora_grid_home: "{{ ora_base }}/product/{{ ora_version.split('.')[0] }}.0.0/grid"
+ora_db_home: "{{ ora_base }}/product/{{ ora_version.split('.')[0] }}.0.0/dbhome_1"
+
+ora_version: 19.3.0.0      # release base da mídia
+
+# Stage: criado pela fase 10 (dono oracle:oinstall, 0775). O DBA copia a mídia via scp
+# para cá DEPOIS da fase 10 e ANTES da fase 20.
+ora_stage_dir: /u01/stage

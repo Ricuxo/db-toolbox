@@ -1,0 +1,17 @@
+---
+# Grupos do gridsetup.rsp (seção B: "OSASM must be different than the other two").
+ora_grid_osdba: asmdba
+ora_grid_osoper: asmoper
+ora_grid_osasm: asmadmin
+
+# ASMLib: discovery string da 19c ladbi ("you must change the disk discovery string to ORCL:*").
+ora_grid_diskstring: "ORCL:*"
+
+# OPatch mínimo para o 19.32 em OL9 (página "Installing Oracle Database 19c (19.32) on Oracle
+# Linux 9 and RHEL 9": "OPatch utility version 12.2.0.1.52 or later").
+ora_grid_opatch_min: 12.2.0.1.52
+
+
+# Avisos do gridSetup (rc 6) aceitos explicitamente. Vazio = qualquer aviso para a fase.
+# Nunca colocar aqui aviso de pré-requisito (ex.: INS-13014); requisito se corrige no servidor.
+ora_grid_accept_warnings: []

@@ -1,0 +1,24 @@
+# Gerado pela role ora_dbca. Contém senhas: 0600, dono {{ ora_owner }}, apagado ao fim.
+# Chaves do template oficial assistants/dbca/dbca.rsp (19.3). Archivelog, tamanho da FRA e do redo
+# não têm chave no template: vão pela linha de comando (Admin Guide 19c, createDatabase).
+responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v19.0.0
+gdbName={{ ora_db_name }}
+sid={{ ora_db_name }}
+databaseConfigType=SI
+createAsContainerDatabase=true
+numberOfPDBs=1
+pdbName={{ ora_pdb_name }}
+useLocalUndoForPDBs=true
+templateName={{ ora_dbca_template }}
+sysPassword={{ vault_ora_sys_password | trim }}
+systemPassword={{ vault_ora_system_password | trim }}
+pdbAdminPassword={{ vault_ora_pdbadmin_password | trim }}
+emConfiguration=NONE
+storageType=ASM
+diskGroupName={{ ora_db_diskgroup }}
+recoveryGroupName={{ ora_db_fra_diskgroup }}
+characterSet={{ ora_db_charset }}
+nationalCharacterSet={{ ora_db_ncharset }}
+sampleSchema=false
+automaticMemoryManagement=false
+totalMemory={{ ora_db_total_memory_mb }}

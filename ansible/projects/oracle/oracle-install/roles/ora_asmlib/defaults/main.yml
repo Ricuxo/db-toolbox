@@ -1,0 +1,8 @@
+---
+# Grupo dono dos discos ASM. 19c: "The Oracle ASM disk devices should be owned by this group"
+# (OSDBA for ASM). Fonte: Creating Operating System Privileges Groups (19c ladbi).
+ora_asmlib_group: asmdba
+
+# Repositório do oracleasm-support. O guia do ASMLib v3 manda manter os pacotes atualizados,
+# por isso fica habilitado de forma persistente (decisão do DBA, 2026-11-13).
+ora_asmlib_repo: "ol{{ ansible_facts['distribution_major_version'] }}_addons"

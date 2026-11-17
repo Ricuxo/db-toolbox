@@ -1,0 +1,12 @@
+---
+# Variáveis só da instalação (projeto oracle-install). Os padrões dos servidores ficam no
+# inventário compartilhado (inventories/<amb>/group_vars/oracle/main.yml).
+# ora_*_accept_warnings: o padrão das roles é [] (nenhum aviso aceito), em todo ambiente.
+
+# Onde RU e one-offs são descompactados (fase 20) e de onde o gridSetup/runInstaller os aplica:
+# <stage>/patches/<ru>/<patchid>/<patchid>/
+ora_stage_patch_dir: "{{ ora_stage_dir }}/patches/{{ ora_ru }}"
+
+# Escopo da 1ª versão do projeto.
+ora_supported_os:
+  - {distribution: OracleLinux, major: "9"}

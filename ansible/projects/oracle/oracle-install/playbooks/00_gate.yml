@@ -1,0 +1,19 @@
+---
+# Fase 00 — somente leitura. Roda antes de qualquer mudança.
+# Aborta se: SO fora do escopo, Oracle instalado/parcial ou outro SGBD.
+# A mídia é verificada na fase 20: o stage só existe depois da fase 10.
+- name: Gate do servidor
+  hosts: "{{ ora_hosts | default('oracle_restart') }}"
+  gather_facts: true
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Guarda de ambiente
+      ansible.builtin.import_role:
+        name: ora_env
+      tags: [always]                # roda mesmo com --tags/--skip-tags
+  tasks:
+    - name: Gate do servidor
+      ansible.builtin.import_role:
+        name: ora_gate
+      tags: [gate]
+

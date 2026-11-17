@@ -1,0 +1,29 @@
+---
+argument_specs:
+  main:
+    short_description: Instala o Oracle Grid Infrastructure for a Standalone Server (Oracle Restart).
+    description:
+      - gridSetup.sh silencioso com -applyRU/-applyOneOffs; nunca -ignorePrereq.
+      - Aborta se não for servidor limpo: instalador rodando, olr.loc, .patch_storage no home ou inventário.
+      - Apaga response files de execuções interrompidas (/tmp/ora_grid_*) antes de começar.
+      - Response file 0600, dono oracle, senhas do Vault, apagado ao fim.
+    options:
+      ora_version: {type: str, required: true}
+      ora_ru: {type: str, required: true}
+      ora_owner: {type: str, required: true}
+      ora_install_group: {type: str, required: true}
+      ora_base: {type: path, required: true}
+      ora_inventory_dir: {type: path, required: true}
+      ora_stage_dir: {type: path, required: true}
+      ora_stage_patch_dir: {type: path, required: true}
+      ora_media: {type: dict, required: true}
+      ora_asm: {type: dict, required: true}
+      vault_ora_sysasm_password: {type: str, required: true, no_log: true}
+      vault_ora_asmsnmp_password: {type: str, required: true, no_log: true}
+      ora_grid_home: {type: path}
+      ora_grid_osdba: {type: str}
+      ora_grid_osoper: {type: str}
+      ora_grid_osasm: {type: str}
+      ora_grid_diskstring: {type: str}
+      ora_grid_opatch_min: {type: str}
+      ora_grid_accept_warnings: {type: list, elements: str}

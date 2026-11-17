@@ -1,0 +1,20 @@
+---
+# Edição (template install/response/db_install.rsp: EE ou SE2). Licenciamento é decisão da casa.
+ora_db_edition: EE
+
+# Grupos de privilégio do db_install.rsp. Nomes da 19c ladbi, "Creating Operating System
+# Privileges Groups" (criados pelo RPM preinstall).
+ora_db_osdba: dba
+ora_db_osoper: oper
+ora_db_osbackupdba: backupdba
+ora_db_osdgdba: dgdba
+ora_db_oskmdba: kmdba
+ora_db_osracdba: racdba
+
+# OPatch mínimo para o 19.32 em OL9 (rnrdm, "Installing Oracle Database 19c (19.32) on Oracle Linux
+# 9 and RHEL 9": "OPatch utility version 12.2.0.1.52 or later").
+ora_db_opatch_min: 12.2.0.1.52
+
+# Avisos do runInstaller (rc 6) aceitos explicitamente. Vazio = qualquer aviso para a fase.
+# Nunca colocar aqui aviso de pré-requisito; requisito se corrige no servidor.
+ora_db_accept_warnings: []

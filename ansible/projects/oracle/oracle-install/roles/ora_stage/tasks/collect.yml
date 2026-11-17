@@ -1,0 +1,97 @@
+---
+# Recolhe para o stage a mídia do catálogo que o DBA deixou em outro diretório do servidor.
+# Só roda com ora_stage_collect_from preenchido. Regras (decisão do DBA, 2026-11-13):
+#   - só arquivo do catálogo (ora_media), e só o que falta no stage;
+#   - só se o sha256 na origem bater com o ora_media;
+#   - só no mesmo filesystem do stage (rename instantâneo; nunca uma cópia escondida de GBs);
+#   - nunca sobrescreve (mv -n) e nunca apaga nada.
+# O verify, em seguida, confere o sha256 de novo já dentro do stage.
+
+- name: Stage | Catálogo
+  ansible.builtin.include_tasks: catalog.yml
+
+- name: Stage | Diretório do stage (criado na fase 10)
+  ansible.builtin.stat:
+    path: "{{ ora_stage_dir }}"
+  register: _collect_stage
+
+- name: Stage | Stage existe
+  ansible.builtin.assert:
+    that: _collect_stage.stat.isdir | default(false)
+    fail_msg: "{{ ora_stage_dir }} não existe. Rode a fase 10 (cria o stage)."
+    quiet: true
+
+- name: Stage | Mídia já presente no stage
+  ansible.builtin.stat:
+    path: "{{ ora_stage_dir }}/{{ item.file }}"
+    get_checksum: false
+  loop: "{{ _stage_items }}"
+  loop_control:
+    label: "{{ item.file }}"
+  register: _collect_in_stage
+
+- name: Stage | Procurar e calcular sha256 nas origens (pode levar alguns minutos)
+  ansible.builtin.stat:
+    path: "{{ item.1 }}/{{ item.0.file }}"
+    get_checksum: true
+    checksum_algorithm: sha256
+  loop: >-
+    {{ _collect_in_stage.results | rejectattr('stat.exists') | map(attribute='item')
+       | product(ora_stage_collect_from) | list }}
+  loop_control:
+    label: "{{ item.1 }}/{{ item.0.file }}"
+  register: _collect_src
+
+# Um status por (arquivo, origem). Usado para mover e para o resumo.
+- name: Stage | Zerar a classificação
+  ansible.builtin.set_fact:
+    _collect_found: []
+
+- name: Stage | Classificar o que foi encontrado
+  ansible.builtin.set_fact:
+    _collect_found: >-
+      {{ _collect_found + [{
+           'file': item.item.0.file,
+           'path': item.item.1 ~ '/' ~ item.item.0.file,
+           'status': 'ausente' if not item.stat.exists
+                     else 'diverge' if item.stat.checksum != item.item.0.sha256 | lower
+                     else 'outro_fs' if item.stat.dev != _collect_stage.stat.dev
+                     else 'mover' }] }}
+  loop: "{{ _collect_src.results }}"
+  loop_control:
+    label: "{{ item.item.1 }}/{{ item.item.0.file }}"
+
+- name: Stage | Mover para o stage (sha256 igual e mesmo filesystem)
+  ansible.builtin.command:
+    argv: [mv, -n, --, "{{ item.path }}", "{{ ora_stage_dir }}/{{ item.file }}"]
+    creates: "{{ ora_stage_dir }}/{{ item.file }}"
+    removes: "{{ item.path }}"
+  become: true
+  loop: "{{ _collect_found | selectattr('status', 'equalto', 'mover') | list }}"
+  loop_control:
+    label: "{{ item.path }} -> {{ ora_stage_dir }}/{{ item.file }}"
+  register: _collect_mv
+
+- name: Stage | Dono e modo da mídia movida
+  ansible.builtin.file:
+    path: "{{ ora_stage_dir }}/{{ item.item.file }}"
+    owner: "{{ ora_owner }}"
+    group: "{{ ora_install_group }}"
+    mode: "0644"
+  become: true
+  loop: "{{ _collect_mv.results | select('changed') | list }}"
+  loop_control:
+    label: "{{ ora_stage_dir }}/{{ item.item.file }}"
+  when: not ansible_check_mode
+
+- name: Stage | Resumo do recolhimento
+  vars:
+    _f: "{{ _collect_found }}"
+    _achados: "{{ _f | rejectattr('status', 'equalto', 'ausente') | map(attribute='file') | list }}"
+  ansible.builtin.debug:
+    msg:
+      - "{{ 'Seriam movidos (--check: nada foi movido)' if ansible_check_mode else 'Movidos' }} para o stage: {{ _collect_mv.results | select('changed') | map(attribute='item.path') | join(', ') or 'nenhum' }}"
+      - "sha256 DIVERGE do ora_media (ficam na origem): {{ _f | selectattr('status', 'equalto', 'diverge') | map(attribute='path') | join(', ') or 'nenhum' }}"
+      - "Em outro filesystem (ficam na origem; mova à mão): {{ _f | selectattr('status', 'equalto', 'outro_fs') | map(attribute='path') | join(', ') or 'nenhum' }}"
+      - "Não encontrados nas origens: {{ _f | map(attribute='file') | unique | reject('in', _achados) | join(', ') or 'nenhum' }}"
+  when: _f | length > 0

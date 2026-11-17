@@ -1,0 +1,67 @@
+---
+# Somente leitura. Falha cedo, antes de qualquer mudança no servidor.
+
+- name: Stage | Catálogo
+  ansible.builtin.include_tasks: catalog.yml
+
+- name: Stage | Diretório do stage existe
+  ansible.builtin.stat:
+    path: "{{ ora_stage_dir }}"
+  register: _stage_dir
+
+- name: Stage | Falta o diretório do stage
+  ansible.builtin.assert:
+    that: _stage_dir.stat.isdir | default(false)
+    fail_msg: "{{ ora_stage_dir }} não existe. Rode a fase 10 (cria o stage) e copie a mídia via scp."
+    quiet: true
+
+- name: Stage | Listar o conteúdo do stage
+  ansible.builtin.find:
+    paths: "{{ ora_stage_dir }}"
+    file_type: any
+    recurse: false
+    hidden: true
+  register: _stage_found
+
+# Só avisa: não bloqueia e não apaga. patches/ é o destino da extração (fase 20).
+- name: Stage | Arquivos fora do catálogo
+  ansible.builtin.set_fact:
+    _stage_extras: >-
+      {{ _stage_found.files | map(attribute='path') | map('basename')
+         | reject('in', (_stage_items | map(attribute='file') | select | list) + ['patches'])
+         | sort }}
+
+- name: Stage | AVISO — arquivos no stage que não estão no ora_media
+  ansible.builtin.debug:
+    msg:
+      - "Fora do catálogo (não são verificados nem usados pelos playbooks): {{ _stage_extras | join(', ') }}"
+      - "Confira se pertencem a esta instalação; se não, retire do stage. Nada foi alterado."
+  when: _stage_extras | length > 0
+
+- name: Stage | Calcular sha256 da mídia (pode levar alguns minutos)
+  ansible.builtin.stat:
+    path: "{{ ora_stage_dir }}/{{ item.file }}"
+    get_checksum: true
+    checksum_algorithm: sha256
+  loop: "{{ _stage_items }}"
+  loop_control:
+    label: "{{ item.file }}"
+  register: _stage_stat
+
+- name: Stage | Arquivo presente e íntegro
+  ansible.builtin.assert:
+    that: item.1 == item.0.sha256 | lower
+    fail_msg: >-
+      {{ item.0.file }}:
+      {{ 'AUSENTE no stage (ou não é arquivo)' if not item.1 else
+         'sha256 DIVERGE (esperado ' ~ item.0.sha256 ~ ', encontrado ' ~ item.1 ~ ')' }}
+    success_msg: "{{ item.0.file }}: ok"
+  # Só o nome e o checksum: com o resultado do stat no laço, cada falha imprimia o stat inteiro.
+  loop: "{{ _stage_items | zip(_stage_stat.results | map(attribute='stat.checksum', default='')) | list }}"
+  loop_control:
+    label: "{{ item.0.file }}"
+  # Em --check o recolhimento (collect.yml) não move: o arquivo que ele moveria já teve o sha256
+  # conferido na origem e ainda não está no stage.
+  when: >-
+    not (ansible_check_mode and item.0.file in (_collect_found | default([])
+         | selectattr('status', 'equalto', 'mover') | map(attribute='file') | list))

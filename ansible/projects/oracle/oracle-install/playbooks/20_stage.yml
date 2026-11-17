@@ -1,0 +1,31 @@
+---
+# Fase 20 — recolhe a mídia para o stage (se ora_stage_collect_from), verifica e descompacta
+# RU e one-offs no layout do stage (precisa do dono e do stage criados na fase 10).
+- name: Extração dos patches no stage
+  hosts: "{{ ora_hosts | default('oracle_restart') }}"
+  gather_facts: false
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Guarda de ambiente
+      ansible.builtin.import_role:
+        name: ora_env
+      tags: [always]                # roda mesmo com --tags/--skip-tags
+  tasks:
+    - name: Recolher mídia para o stage
+      ansible.builtin.include_role:
+        name: ora_stage
+        tasks_from: collect
+      tags: [stage_collect]
+      when: ora_stage_collect_from | default([]) | length > 0
+
+    - name: Verificar mídia antes de extrair
+      ansible.builtin.include_role:
+        name: ora_stage
+        tasks_from: verify
+      tags: [stage_verify]
+
+    - name: Extrair patches
+      ansible.builtin.include_role:
+        name: ora_stage
+        tasks_from: extract
+      tags: [stage_extract]

@@ -1,0 +1,226 @@
+---
+# Preparação do host: RPM preinstall (recomendado pela documentação) + só o que ele não cobre.
+# Não altera SELinux, firewall, swap nem discos. No GRUB só troca o THP para 'madvise'
+# (guia, UEK7+); o 'numa=off' gravado pelo preinstall é documentado e fica.
+
+- name: Host | Release suportado por esta role
+  ansible.builtin.assert:
+    that:
+      - _hp_release in ora_host_prep_preinstall_rpm
+      - _hp_release in ora_host_prep_packages
+    fail_msg: "Release {{ ora_version }} sem preinstall/lista de pacotes definidos nesta role."
+    quiet: true
+  vars:
+    _hp_release: "{{ ora_version.split('.')[0] }}"
+
+- name: Host | RPM preinstall
+  ansible.builtin.dnf:
+    name: "{{ ora_host_prep_preinstall_rpm[ora_version.split('.')[0]] }}"
+    state: present
+
+- name: Host | Pacotes exigidos pela documentação da versão
+  ansible.builtin.dnf:
+    name: "{{ ora_host_prep_packages[ora_version.split('.')[0]] }}"
+    state: present
+
+- name: Host | Dono do software criado pelo preinstall
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ ora_owner }}"
+    fail_key: false
+
+- name: Host | Dono existe?
+  ansible.builtin.set_fact:
+    _hp_owner_exists: "{{ (getent_passwd[ora_owner] | default(none)) is not none }}"
+
+- name: Host | Dono ausente
+  ansible.builtin.assert:
+    that: _hp_owner_exists | bool or ansible_check_mode
+    fail_msg: "{{ ora_owner }} não existe depois do preinstall. Verifique o RPM instalado."
+    quiet: true
+
+- name: Host | Em --check sem o dono, tarefas dependentes são puladas
+  ansible.builtin.debug:
+    msg: "--check: {{ ora_owner }} ainda não existe (o preinstall não roda em check). Diretórios e grupo primário não avaliados."
+  when: not _hp_owner_exists | bool
+
+- name: Host | Grupo primário do dono
+  ansible.builtin.command: id -gn {{ ora_owner }}
+  register: _hp_primary_group
+  changed_when: false
+  check_mode: false
+  when: _hp_owner_exists | bool
+
+- name: Host | oinstall é o grupo primário (exigência do guia)
+  ansible.builtin.assert:
+    that: _hp_primary_group.stdout == ora_install_group
+    fail_msg: >-
+      Grupo primário de {{ ora_owner }} é '{{ _hp_primary_group.stdout }}'; o guia exige
+      '{{ ora_install_group }}' como grupo primário de todo dono de software Oracle.
+    quiet: true
+  when: _hp_owner_exists | bool
+
+- name: Host | Grupos de ASM
+  ansible.builtin.group:
+    name: "{{ item.name }}"
+    gid: "{{ item.gid }}"
+  loop: "{{ ora_host_prep_asm_groups }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.gid }})"
+  when: ora_asm is defined
+  register: _hp_asm_groups
+
+- name: Host | Dono nos grupos de ASM
+  ansible.builtin.user:
+    name: "{{ ora_owner }}"
+    groups: "{{ ora_host_prep_asm_groups | map(attribute='name') | list }}"
+    append: true
+  when:
+    - ora_asm is defined
+    - _hp_owner_exists | bool
+    - not (ansible_check_mode and _hp_asm_groups is changed)   # em --check os grupos ainda não existem
+
+- name: Host | Diretórios OFA e stage
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ora_owner }}"
+    group: "{{ ora_install_group }}"
+    mode: "0775"
+  loop:
+    - "{{ ora_app_dir }}"
+    - "{{ ora_base }}"
+    - "{{ ora_stage_dir }}"
+  when: _hp_owner_exists | bool
+
+# O oraInventory só é criado: depois da instalação, o instalador define as permissões dele e a
+# fase 10 não deve desfazê-las (visto em 2026-11-14: a role trocava 0770 por 0775).
+- name: Host | oraInventory existe?
+  ansible.builtin.stat:
+    path: "{{ ora_inventory_dir }}"
+  register: _hp_orainv
+
+- name: Host | Criar oraInventory (só se ausente)
+  ansible.builtin.file:
+    path: "{{ ora_inventory_dir }}"
+    state: directory
+    owner: "{{ ora_owner }}"
+    group: "{{ ora_install_group }}"
+    mode: "0775"
+  when:
+    - _hp_owner_exists | bool
+    - not _hp_orainv.stat.exists
+
+- name: Host | Parâmetros de kernel exigidos pelo gridSetup 19.32 (além do preinstall)
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: "{{ ora_host_prep_sysctl_file }}"
+    sysctl_set: true
+    reload: true
+  loop: "{{ ora_host_prep_sysctl_extra | dict2items }}"
+  loop_control:
+    label: "{{ item.key }} = {{ item.value }}"
+
+# Nome do servidor no /etc/hosts, haja DNS ou não (decisão do DBA, 2026-11-14). O guia aceita
+# DNS, NIS ou /etc/hosts; sem nenhum deles o nome só resolvia pelo nss 'myhostname' (IPv6
+# link-local primeiro) e o listener do Restart ficou INTERMEDIATE no laboratório.
+# Fonte: Confirming Host Name Resolution (19c)
+# https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/configuring-operating-systems-for-oracle-database-on-linux/confirming-host-name-resolution.html
+# Nomes do 'nodename' (uname -n), não do fato 'fqdn': este é resolvido pelo próprio /etc/hosts e
+# vira 'localhost.localdomain' se o nome estiver no 127.0.0.1 (visto no teste negativo).
+- name: Host | Entrada esperada no /etc/hosts
+  ansible.builtin.set_fact:
+    _hp_hosts_line: >-
+      {{ ([ansible_facts['default_ipv4']['address'], ansible_facts['nodename'],
+           ansible_facts['nodename'].split('.')[0]] | unique) | join(' ') }}
+  when: ansible_facts['default_ipv4']['address'] is defined
+
+- name: Host | IPv4 da rota padrão encontrado
+  ansible.builtin.assert:
+    that: _hp_hosts_line is defined
+    fail_msg: "Sem IPv4 na rota padrão (ansible_default_ipv4): não há endereço para o /etc/hosts."
+    quiet: true
+
+# Linha que cita o IP ou o nome e não é exatamente a esperada = conflito (nome em 127.0.0.1 ou em
+# outro IP, apelidos extras). Não corrige sozinho: o DBA decide.
+- name: Host | Conflitos no /etc/hosts
+  ansible.builtin.command:
+    argv:
+      - awk
+      - -v
+      - "want={{ _hp_hosts_line }}"
+      - |
+        BEGIN { n = split(want, w, " ") }
+        /^[[:space:]]*(#|$)/ { next }
+        { l = $1; for (i = 2; i <= NF; i++) l = l " " $i; if (l == want) next
+          hit = ($1 == w[1]); for (i = 2; i <= NF; i++) for (j = 2; j <= n; j++) if ($i == w[j]) hit = 1
+          if (hit) print }
+      - /etc/hosts
+  register: _hp_hosts_conflict
+  changed_when: false
+  check_mode: false
+
+- name: Host | /etc/hosts sem conflito
+  ansible.builtin.assert:
+    that: _hp_hosts_conflict.stdout_lines | length == 0
+    fail_msg: >-
+      /etc/hosts tem linha que conflita com '{{ _hp_hosts_line }}':
+      {{ _hp_hosts_conflict.stdout_lines | join(' | ') }}. Corrija à mão e rode de novo.
+    quiet: true
+
+- name: Host | Nome do servidor no /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: "^\\s*{{ ansible_facts['default_ipv4']['address'] | regex_escape }}\\s"
+    line: "{{ _hp_hosts_line }}"
+    backup: true
+
+- name: Host | /dev/shm sem nosuid/noexec (exigência do guia)
+  ansible.posix.mount:
+    path: /dev/shm
+    src: tmpfs
+    fstype: tmpfs
+    opts: defaults
+    state: mounted
+
+# THP: o guia manda 'madvise' em UEK7 ou superior. O preinstall 19c el9 grava 'never' para
+# qualquer kernel (arquivo .param do RPM); a role segue a documentação e sobrescreve.
+# Fonte: Setting and Disabling Transparent HugePages on UEK Kernels (19c)
+# https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/configuring-operating-systems-for-oracle-database-on-linux/setting-and-disabling-transparent-hugepages-on-uek-kernels.html
+- name: Host | Kernel UEK7 ou superior (regra de THP desta role)
+  ansible.builtin.assert:
+    that:
+      - "'uek' in ansible_facts['kernel']"
+      - ansible_facts['kernel'] is version('5.15', '>=')
+    fail_msg: >-
+      Kernel {{ ansible_facts['kernel'] }} fora da regra implementada (UEK7 ou superior → madvise).
+      Para kernels anteriores o guia pede THP desabilitado; não implementado nesta versão.
+    quiet: true
+
+- name: Host | THP madvise no GRUB_CMDLINE_LINUX (substitui valor existente)
+  ansible.builtin.replace:
+    path: /etc/default/grub
+    regexp: 'transparent_hugepage=\S+?(?=["\s])'
+    replace: transparent_hugepage=madvise
+    backup: true
+  notify: Host | Regenerar grub.cfg e entradas BLS
+
+- name: Host | THP madvise no GRUB_CMDLINE_LINUX (acrescenta se ausente)
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^(GRUB_CMDLINE_LINUX="(?!.*transparent_hugepage=).*)"$'
+    line: '\1 transparent_hugepage=madvise"'
+    backrefs: true
+    backup: true
+  notify: Host | Regenerar grub.cfg e entradas BLS
+
+- name: Host | THP em uso
+  ansible.builtin.slurp:
+    src: /sys/kernel/mm/transparent_hugepage/enabled
+  register: _hp_thp
+
+- name: Host | THP madvise em tempo de execução (procedimento do guia)
+  ansible.builtin.shell: echo madvise > /sys/kernel/mm/transparent_hugepage/enabled
+  changed_when: true
+  when: "'[madvise]' not in (_hp_thp.content | b64decode)"

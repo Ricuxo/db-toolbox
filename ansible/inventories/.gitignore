@@ -1,0 +1,2 @@
+# Arquivo de senha do vault nunca entra no repositório
+.vault_pass*

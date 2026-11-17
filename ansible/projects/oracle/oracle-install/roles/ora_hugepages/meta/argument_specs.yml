@@ -1,0 +1,24 @@
+---
+argument_specs:
+  main:
+    short_description: Configura HugePages para o SGA do banco já criado e fixa USE_LARGE_PAGES (reinicia o banco).
+    description:
+      - Depois do banco criado, como manda a doc 19c. Calcula vm.nr_hugepages pelo sga_max_size.
+      - Reinicia o banco via srvctl quando o SGA não está em HugePages ou o USE_LARGE_PAGES muda.
+      - Idempotente; não altera THP, memlock nem vm.hugetlb_shm_group (só confere).
+    options:
+      ora_owner: {type: str, required: true}
+      ora_base: {type: path, required: true}
+      ora_db_home: {type: path, required: true}
+      ora_db_name: {type: str, required: true}
+      ora_db_services:
+        type: list
+        elements: dict
+        required: true
+        options:
+          name: {type: str, required: true}
+          pdb: {type: str, required: true}
+      ora_hugepages_sysctl_file: {type: path}
+      ora_hugepages_extra: {type: int}
+      ora_hugepages_max_pct: {type: int}
+      ora_db_use_large_pages: {type: str, choices: ['TRUE', 'ONLY', 'AUTO_ONLY']}

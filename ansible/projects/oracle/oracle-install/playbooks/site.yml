@@ -1,0 +1,29 @@
+---
+# Fases implementadas até agora (Etapas 1, 2 e 3: fases 00 a 70). Entre a fase 10 e a instalação do software, rode a validação de
+# confirmação dos pré-requisitos de SO.
+- name: Fase 00 — gate
+  ansible.builtin.import_playbook: 00_gate.yml
+
+- name: Fase 10 — preparação do host
+  ansible.builtin.import_playbook: 10_host_prep.yml
+
+- name: Fase 20 — stage
+  ansible.builtin.import_playbook: 20_stage.yml
+
+- name: Fase 30 — ASMLib v3
+  ansible.builtin.import_playbook: 30_asmlib.yml
+
+- name: Fase 40 — Grid Infrastructure (Restart)
+  ansible.builtin.import_playbook: 40_grid.yml
+
+- name: Fase 50 — software do Oracle Database
+  ansible.builtin.import_playbook: 50_db_software.yml
+
+- name: Fase 60 — criação do banco
+  ansible.builtin.import_playbook: 60_dbca.yml
+
+- name: Fase 65 — serviços das PDBs
+  ansible.builtin.import_playbook: 65_db_service.yml
+
+- name: Fase 70 — HugePages
+  ansible.builtin.import_playbook: 70_hugepages.yml

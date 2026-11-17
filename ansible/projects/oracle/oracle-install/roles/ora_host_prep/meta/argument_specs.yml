@@ -1,0 +1,21 @@
+---
+argument_specs:
+  main:
+    short_description: Prepara o host para Oracle (preinstall + o que ele não cobre).
+    description:
+      - Não altera SELinux, firewall, swap nem discos.
+      - No GRUB só troca THP para madvise (guia 19c, UEK7+); numa=off do preinstall fica.
+      - Não reinicia o servidor; mudanças de boot valem no próximo reinício.
+    options:
+      ora_version: {type: str, required: true}
+      ora_owner: {type: str, required: true}
+      ora_install_group: {type: str, required: true}
+      ora_app_dir: {type: path, required: true}
+      ora_base: {type: path, required: true}
+      ora_inventory_dir: {type: path, required: true}
+      ora_host_prep_preinstall_rpm: {type: dict}
+      ora_host_prep_packages: {type: dict}
+      ora_host_prep_asm_groups: {type: list, elements: dict}
+      ora_host_prep_sysctl_file: {type: path}
+      ora_host_prep_sysctl_extra: {type: dict}
+      ora_asm: {type: dict}

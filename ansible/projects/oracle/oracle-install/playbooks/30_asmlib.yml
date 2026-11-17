@@ -1,0 +1,14 @@
+---
+# Fase 30 — ASMLib v3 e marcação dos discos de ora_asm (precisa das fases 10 e 20).
+- name: ASMLib v3
+  hosts: "{{ ora_hosts | default('oracle_restart') }}"
+  gather_facts: true
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Guarda de ambiente
+      ansible.builtin.import_role:
+        name: ora_env
+      tags: [always]                # roda mesmo com --tags/--skip-tags
+  roles:
+    - role: ora_asmlib
+      tags: [asmlib]

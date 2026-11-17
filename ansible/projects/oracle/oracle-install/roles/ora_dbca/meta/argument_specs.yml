@@ -1,0 +1,30 @@
+---
+argument_specs:
+  main:
+    short_description: Cria o banco (CDB + PDBs) com dbca silencioso no servidor com Oracle Restart e ASM.
+    description:
+      - dbca -silent -createDatabase com response file do template oficial; nunca -ignorePrereqFailure.
+      - Aborta se o banco já existir (oratab, Restart, pmon, logs do dbca) ou com dbca rodando.
+      - Response file 0600, dono oracle, senhas do Vault, apagado ao fim.
+    options:
+      ora_owner: {type: str, required: true}
+      ora_install_group: {type: str, required: true}
+      ora_base: {type: path, required: true}
+      ora_grid_home: {type: path, required: true}
+      ora_db_home: {type: path, required: true}
+      ora_asm: {type: dict, required: true}
+      ora_db_name: {type: str, required: true}
+      ora_pdb_name: {type: str, required: true}
+      ora_db_total_memory_mb: {type: int, required: true}
+      ora_db_fra_size_mb: {type: int, required: true}
+      ora_db_redo_size_mb: {type: int, required: true}
+      vault_ora_sys_password: {type: str, required: true, no_log: true}
+      vault_ora_system_password: {type: str, required: true, no_log: true}
+      vault_ora_pdbadmin_password: {type: str, required: true, no_log: true}
+      ora_dbca_template: {type: str}
+      ora_db_charset: {type: str}
+      ora_db_ncharset: {type: str}
+      ora_db_diskgroup: {type: str}
+      ora_db_fra_diskgroup: {type: str}
+      ora_db_archivelog: {type: bool}
+      ora_dbca_accept_warnings: {type: list, elements: str}

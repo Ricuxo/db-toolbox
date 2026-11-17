@@ -1,0 +1,34 @@
+---
+argument_specs:
+  verify:
+    short_description: Confere se a mídia do catálogo está no stage com o sha256 certo (só leitura).
+    options:
+      ora_stage_dir: {type: path, required: true}
+      ora_media:
+        type: dict
+        required: true
+        description:
+          - Catálogo da mídia. Cada item tem file e sha256 (do MOS); ru_grid e ru_db têm patchid.
+          - Chaves obrigatórias grid_base, db_base, opatch, ru_grid, ru_db; oneoffs é lista opcional.
+  collect:
+    short_description: Move para o stage a mídia do catálogo deixada em outro diretório do servidor.
+    options:
+      ora_stage_dir: {type: path, required: true}
+      ora_media: {type: dict, required: true}
+      ora_stage_collect_from:
+        type: list
+        elements: path
+        required: true
+        description:
+          - Diretórios de origem. Só move item do catálogo ausente no stage, com sha256 igual ao
+            ora_media e no mesmo filesystem do stage. Nunca sobrescreve nem apaga.
+      ora_owner: {type: str, required: true}
+      ora_install_group: {type: str, required: true}
+  extract:
+    short_description: Descompacta RU e one-offs no layout do stage (idempotente).
+    options:
+      ora_stage_dir: {type: path, required: true}
+      ora_ru: {type: str, required: true}
+      ora_owner: {type: str, required: true}
+      ora_install_group: {type: str, required: true}
+      ora_media: {type: dict, required: true}

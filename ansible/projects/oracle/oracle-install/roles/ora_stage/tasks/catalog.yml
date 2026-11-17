@@ -1,0 +1,30 @@
+---
+# Catálogo da mídia (_stage_items), obrigatoriamente completo. Incluído por verify e collect.
+# Sem sha256 não há como provar a integridade nem decidir o que mover.
+
+- name: Stage | Chaves obrigatórias do catálogo
+  ansible.builtin.assert:
+    that: item in ora_media
+    fail_msg: "ora_media sem a chave obrigatória '{{ item }}'."
+    quiet: true
+  loop: [grid_base, db_base, opatch, ru_grid, ru_db]
+
+- name: Stage | Montar lista de mídia esperada
+  ansible.builtin.set_fact:
+    _stage_items: >-
+      {{ [ora_media.grid_base, ora_media.db_base, ora_media.opatch,
+          ora_media.ru_grid, ora_media.ru_db] + (ora_media.oneoffs | default([]))
+       + ([ora_media.asmlib] if ora_media.asmlib is defined else [])
+       + ([ora_media.cvu] if ora_media.cvu is defined else []) }}
+
+- name: Stage | Catálogo completo (arquivo e sha256 preenchidos)
+  ansible.builtin.assert:
+    that:
+      - _stage_items | rejectattr('file', 'truthy') | list | length == 0
+      - _stage_items | rejectattr('sha256', 'truthy') | list | length == 0
+      - ora_media.ru_grid.patchid | default('') | length > 0
+      - ora_media.ru_db.patchid | default('') | length > 0
+    fail_msg: >-
+      ora_media incompleto: todo item precisa de file e sha256 (copiado do MOS),
+      e os RUs precisam de patchid. Sem checksum não há como provar a integridade da mídia.
+    quiet: true

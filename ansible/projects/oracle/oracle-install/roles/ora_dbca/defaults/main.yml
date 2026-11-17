@@ -1,0 +1,17 @@
+---
+# Template de banco da mídia ($ORACLE_HOME/assistants/dbca/templates).
+ora_dbca_template: General_Purpose.dbc
+
+# Conjuntos de caracteres. AL32UTF8 é o padrão dos templates General Purpose desde a 12.2 (19c ladbi,
+# "About Character Set Selection During Installation"); o dbca.rsp sem valor usa "US7ASCII".
+ora_db_charset: AL32UTF8
+ora_db_ncharset: AL16UTF16
+
+# Diskgroup dos datafiles e da FRA (o primeiro de ora_asm, criado na fase 40).
+ora_db_diskgroup: "{{ ora_asm.diskgroups[0].name }}"
+ora_db_fra_diskgroup: "{{ ora_asm.diskgroups[0].name }}"
+
+ora_db_archivelog: true
+
+# Avisos do dbca ([WARNING] [DBT-nnnnn]) aceitos explicitamente. Vazio = qualquer aviso para a fase.
+ora_dbca_accept_warnings: []

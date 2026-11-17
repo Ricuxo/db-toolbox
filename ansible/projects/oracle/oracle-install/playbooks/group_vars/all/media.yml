@@ -1,0 +1,42 @@
+---
+# RU alvo e catálogo da mídia da INSTALAÇÃO (projeto oracle-install), iguais para todo ambiente:
+# o sha256 do MOS é o mesmo em qualquer lugar. Trocar de RU = trocar este arquivo.
+# Precedência: um group_vars/<grupo> ou host_vars do inventário vence este arquivo.
+# ora_version (release instalado no servidor) fica no inventário: group_vars/oracle/main.yml.
+
+ora_ru: 19.32.0.0          # obrigatório: OL9 com UEK 8 só é suportado a partir do 19.32 (guia 19c)
+
+# Catálogo da mídia que o DBA coloca em ora_stage_dir.
+# sha256: copiar do My Oracle Support (detalhes do download). Sem sha256 o stage falha.
+# sha256 conferidos pelo DBA em 2026-11-13: OPatch e RUs com o MOS; bases 19.3 com o
+# Oracle Software Delivery Cloud.
+ora_media:
+  grid_base: {file: LINUX.X64_193000_grid_home.zip, sha256: d668002664d9399cf61eb03c0d1e3687121fc890b1ddd50b35dcbe13c5307d2e}
+  db_base:   {file: LINUX.X64_193000_db_home.zip,   sha256: ba8329c757133da313ed3b6d7f86c5ac42cd9970a28bf2e6233f3235233aa8d8}
+  opatch:    {file: p6880880_190000_Linux-x86-64.zip, sha256: 8fd0d738032626d4455a8a67004c6576ef0bb62870b49758a1b1fb4b34046fde}
+  ru_grid:   {file: p39467003_190000_Linux-x86-64.zip, patchid: "39467003", sha256: 5eba8519ac16e7eb2701f977b5f81f0e7f49225da1f430966bdc8fed9e649198}  # GI RELEASE UPDATE 19.32.0.0.0
+  ru_db:     {file: p39472050_190000_Linux-x86-64.zip, patchid: "39472050", sha256: 9cef81dc1de61635ec8680480b49db2334c35322f106189c1eb32f62cadc4350}  # DATABASE RELEASE UPDATE 19.32.0.0.0
+  # One-offs exigidos no comando do gridSetup/runInstaller da página oficial "Installing Oracle
+  # Database 19c (19.32) on Oracle Linux 9 and RHEL 9". sha256 conferidos com o MOS (2026-11-13).
+  oneoffs:
+    # 39932578 FORA da instalação, também em produção (decisão do DBA, 2026-11-16). Motivo:
+    # - a página oficial da 19.32 o inclui no gridSetup, mas o arquivo entregue pelo MOS (dois
+    #   downloads) tem sha256 78e4cc07…f664c89d09, diferente do digest publicado 97d0087e…abb978c9;
+    #   a regra do projeto só aceita mídia com o sha256 do MOS, então ele não pode entrar;
+    # - a instalação não depende dele: duas instalações do zero no lab (VMs 5 e 6, 2026-11-16)
+    #   passaram na checagem do gridSetup sem avisos aceitos, e os outros dois one-offs só exigem o
+    #   39472050 (prereq_oneoffs).
+    # É um desvio do procedimento da página, registrado aqui. Se a Oracle confirmar o digest (SR),
+    # aplicar como patch pós-instalação com opatchauto, fora deste projeto.
+    # - {file: p39932578_1932000OCWRU_Linux-x86-64.zip, patchid: "39932578", sha256: 97d0087e3efa35e1f3ceb1bc2ea37a61eb1e00e05cc036c68ef1d0e2abb978c9}  # MERGE ON OCW RU 19.32.0.0.0 OF 36365489 36429384 37409807 38872548 39729560
+    - {file: p39544247_1932000DBRU_Linux-x86-64.zip,  patchid: "39544247", sha256: 47d1524edf9078fed875f8d516f1ac8ae7c46812016f9d2a2b5670a985643480}  # LNX-OL9-19RU-ZIP: REMOTE ROOT.SH POSTPATCH FAILS ... ORA-00600 [KFNSBACKGROUND11]
+    - {file: p39388682_1932000DBRU_Generic.zip,       patchid: "39388682", sha256: 22c5b6e2e38c355edc9dcb9d85ce8b9ba3e976915a4607b37d2f4f588406dc1d}  # PL19.31SHIPTEST OL10 :OCCI DEMOS ARE FAILING DURING COMPILATION
+  # ASMLib v3 para OL9 (oracle.com/linux/downloads/linux-asmlib-v9-downloads.html), sha256 da
+  # página oficial (2026-11-13). O oracleasm-support vem do ol9_addons (gpgcheck=1), sem catálogo.
+  asmlib: {file: oracleasmlib-3.1.3-1.el9.x86_64.rpm, sha256: 815a2eda1062220fe0abb94dd01c4ff97cc01ea2305be808f89423b59921786a}
+  # CVU avulso (MOS 30839369, 23.26.3), sha256 do MOS. NÃO usado na 19c em OL9: não tem dados de
+  # referência de 19c para OL9 (usa os do OL7). Mapeado para quando o alvo for 26ai.
+  # cvu: {file: p30839369_2326000_Linux-x86-64.zip, sha256: 23da73fed4b9403f933a5bbb8e75e9b6931ed5fd33fd1dbfc6503227de70bdc8}
+  # Mapeado para quando ora_ru for 19.33 (NÃO usar com 19.32). 39932578 sem variante 19.33 até 2026-11-13.
+  #   - {file: p39544247_1933000DBRU_Linux-x86-64.zip, patchid: "39544247", sha256: ac205f4705ad54d5f1233cfcf0a0750736991442869759a6cbebd709a397c81a}
+  #   - {file: p39388682_1933000DBRU_Generic.zip,      patchid: "39388682", sha256: e775e027313ab01a367b18bccdf7cbf75d664830de628d675494092eef3d16e0}

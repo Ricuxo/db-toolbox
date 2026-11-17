@@ -1,0 +1,19 @@
+# Gerado pela role ora_grid. Contém senhas: 0600, dono {{ ora_owner }}, apagado ao fim.
+# Chaves do template oficial install/response/gridsetup.rsp (19.3), seções A, B e G
+# ("To register and configure 'Grid Infrastructure for Standalone server'").
+oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_schema_v19.0.0
+INVENTORY_LOCATION={{ ora_inventory_dir }}
+oracle.install.option=HA_CONFIG
+ORACLE_BASE={{ ora_base }}
+oracle.install.asm.OSDBA={{ ora_grid_osdba }}
+oracle.install.asm.OSOPER={{ ora_grid_osoper }}
+oracle.install.asm.OSASM={{ ora_grid_osasm }}
+oracle.install.asm.SYSASMPassword={{ vault_ora_sysasm_password | trim }}
+oracle.install.asm.diskGroup.name={{ _grid_dg.name }}
+oracle.install.asm.diskGroup.redundancy={{ _grid_dg.redundancy }}
+oracle.install.asm.diskGroup.AUSize={{ _grid_dg.au_size | default(1) }}
+oracle.install.asm.diskGroup.disks={{ _grid_dg.disks | map('regex_replace', '^', 'ORCL:') | join(',') }}
+oracle.install.asm.diskGroup.diskDiscoveryString={{ ora_grid_diskstring }}
+oracle.install.asm.monitorPassword={{ vault_ora_asmsnmp_password | trim }}
+oracle.install.asm.configureAFD=false
+oracle.install.config.managementOption=NONE

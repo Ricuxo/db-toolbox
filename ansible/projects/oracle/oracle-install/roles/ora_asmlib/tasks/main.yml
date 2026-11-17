@@ -1,0 +1,191 @@
+---
+# Fase 30 — ASMLib v3 e marcação dos discos de ora_asm. Fontes:
+#   - Oracle Linux "Installing and Configuring Oracle ASMLIB v3" (G14969-10)
+#   - man oracleasm-configure(8) e oracleasm-createdisk(8) do oracleasm-support 3.1.1:
+#     "createdisk will refuse to consider the entire unpartitioned disk. The disk must be
+#     partitioned" → uma partição GPT ocupando o disco todo (decisão do DBA, 2026-11-13).
+
+# ---------- Pré-condições (somente leitura) ----------
+- name: ASMLib | Discos por identificador estável
+  ansible.builtin.assert:
+    that: ora_asm.disks | rejectattr('device', 'match', '^/dev/disk/by-id/') | list | length == 0
+    fail_msg: >-
+      Todo disco de ora_asm precisa ser /dev/disk/by-id/... (nunca /dev/sdX: os nomes mudam entre
+      boots). Fora do padrão: {{ ora_asm.disks | rejectattr('device', 'match', '^/dev/disk/by-id/')
+      | map(attribute='device') | list }}
+    quiet: true
+
+- name: ASMLib | Tipo e partições de cada disco
+  ansible.builtin.command: lsblk -nro TYPE {{ item.device }}
+  loop: "{{ ora_asm.disks }}"
+  loop_control:
+    label: "{{ item.label }} {{ item.device }}"
+  register: _al_lsblk
+  changed_when: false
+  check_mode: false
+
+- name: ASMLib | É disco inteiro com no máximo uma partição
+  ansible.builtin.assert:
+    that:
+      - item.stdout_lines[0] == 'disk'
+      - item.stdout_lines | length <= 2
+    fail_msg: >-
+      {{ item.item.device }}: esperado um disco inteiro com 0 ou 1 partição; encontrado
+      {{ item.stdout_lines }}. Nada foi alterado.
+    quiet: true
+  loop: "{{ _al_lsblk.results }}"
+  loop_control:
+    label: "{{ item.item.label }}"
+
+- name: ASMLib | Assinaturas no disco sem partição (tem de estar vazio)
+  ansible.builtin.command: wipefs -n --noheadings {{ item.item.device }}
+  loop: "{{ _al_lsblk.results | selectattr('stdout', 'equalto', 'disk') }}"
+  loop_control:
+    label: "{{ item.item.label }}"
+  register: _al_wipefs
+  changed_when: false
+  check_mode: false
+  failed_when: _al_wipefs.rc != 0 or _al_wipefs.stdout | length > 0
+
+- name: ASMLib | Conteúdo da partição existente
+  ansible.builtin.command: blkid -p -o value -s TYPE {{ item.item.device }}-part1
+  loop: "{{ _al_lsblk.results | selectattr('stdout', 'equalto', 'disk\npart') }}"
+  loop_control:
+    label: "{{ item.item.label }}"
+  register: _al_blkid
+  changed_when: false
+  check_mode: false
+  failed_when: _al_blkid.stdout not in ['', 'oracleasm']
+
+- name: ASMLib | oracleasmlib no catálogo
+  ansible.builtin.assert:
+    that: ora_media.asmlib.file | default('') | length > 0 and ora_media.asmlib.sha256 | default('') | length > 0
+    fail_msg: "ora_media.asmlib (file + sha256) é obrigatório para a fase 30."
+    quiet: true
+
+- name: ASMLib | sha256 do oracleasmlib
+  ansible.builtin.stat:
+    path: "{{ ora_stage_dir }}/{{ ora_media.asmlib.file }}"
+    checksum_algorithm: sha256
+  register: _al_rpm
+
+- name: ASMLib | oracleasmlib íntegro
+  ansible.builtin.assert:
+    that: _al_rpm.stat.checksum | default('') == ora_media.asmlib.sha256 | lower
+    fail_msg: "{{ ora_media.asmlib.file }}: ausente no stage ou sha256 diferente do catálogo."
+    quiet: true
+
+- name: ASMLib | Assinatura do oracleasmlib (rpm -K)
+  ansible.builtin.command: rpm -K {{ ora_stage_dir }}/{{ ora_media.asmlib.file }}
+  register: _al_sig
+  changed_when: false
+  check_mode: false
+  failed_when: "'digests signatures OK' not in _al_sig.stdout"
+
+# ---------- Instalação e configuração ----------
+- name: ASMLib | Repositórios habilitados
+  ansible.builtin.command: dnf repolist --enabled
+  register: _al_repos
+  changed_when: false
+  check_mode: false
+
+- name: ASMLib | Habilitar {{ ora_asmlib_repo }} de forma persistente
+  ansible.builtin.command: dnf config-manager --set-enabled {{ ora_asmlib_repo }}
+  when: ora_asmlib_repo not in _al_repos.stdout
+
+- name: ASMLib | Pacotes
+  ansible.builtin.dnf:
+    name:
+      - oracleasm-support
+      - "{{ ora_stage_dir }}/{{ ora_media.asmlib.file }}"
+    state: present
+    enablerepo: "{{ ora_asmlib_repo }}"   # também cobre o --check, em que o config-manager não roda
+  register: _al_pkgs
+
+# Em --check sem os pacotes, o resto não tem como ser avaliado.
+- name: ASMLib | Fim do --check (pacotes ainda não instalados)
+  ansible.builtin.meta: end_host
+  when: ansible_check_mode and _al_pkgs is changed
+
+- name: ASMLib | Configuração atual
+  ansible.builtin.command: oracleasm configure
+  register: _al_cfg
+  changed_when: false
+  check_mode: false
+
+- name: ASMLib | Dono/grupo dos discos e serviço habilitado (oracleasm-configure(8))
+  ansible.builtin.command: oracleasm configure -e -u {{ ora_owner }} -g {{ ora_asmlib_group }}
+  # A saída do configure traz ORACLEASM_UID/GID; o serviço habilitado é garantido pela task seguinte.
+  when: >-
+    (('ORACLEASM_UID=' ~ ora_owner) not in _al_cfg.stdout_lines) or
+    (('ORACLEASM_GID=' ~ ora_asmlib_group) not in _al_cfg.stdout_lines)
+
+- name: ASMLib | Serviço oracleasm
+  ansible.builtin.systemd_service:
+    name: oracleasm
+    enabled: true
+    state: started
+
+- name: ASMLib | Status (UEK 7+ usa io_uring, KABI_V3)
+  ansible.builtin.command: oracleasm status
+  register: _al_status
+  changed_when: false
+  check_mode: false
+  failed_when: _al_status.rc != 0 or 'KABI_V3' not in _al_status.stdout
+
+# ---------- Discos ----------
+# As tasks de disco dependem umas das outras (partição → label); em --check param aqui.
+- name: ASMLib | Fim do --check antes de particionar/marcar
+  ansible.builtin.meta: end_host
+  when: ansible_check_mode
+
+- name: ASMLib | Partição GPT ocupando o disco vazio
+  ansible.builtin.command: parted -s {{ item.item.device }} mklabel gpt mkpart primary 1MiB 100%
+  loop: "{{ _al_lsblk.results | selectattr('stdout', 'equalto', 'disk') }}"
+  loop_control:
+    label: "{{ item.item.label }} {{ item.item.device }}"
+  register: _al_parted
+
+- name: ASMLib | Aguardar o udev criar o -part1
+  ansible.builtin.command: udevadm settle
+  when: _al_parted is changed
+  changed_when: false
+
+- name: ASMLib | Label atual de cada partição
+  ansible.builtin.command: oracleasm querydisk {{ item.device }}-part1
+  loop: "{{ ora_asm.disks }}"
+  loop_control:
+    label: "{{ item.label }}"
+  register: _al_query
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: ASMLib | Partição com outro label (não mexe)
+  ansible.builtin.assert:
+    that: >-
+      'is marked as an ASM disk' not in item.stdout or
+      ('label "' ~ item.item.label ~ '"') in item.stdout
+    fail_msg: "{{ item.item.device }}-part1 já é disco ASM com outro label: {{ item.stdout }}"
+    quiet: true
+  loop: "{{ _al_query.results }}"
+  loop_control:
+    label: "{{ item.item.label }}"
+
+- name: ASMLib | Marcar disco para o ASM
+  ansible.builtin.command: oracleasm createdisk {{ item.item.label }} {{ item.item.device }}-part1
+  loop: "{{ _al_query.results | rejectattr('stdout', 'search', 'is marked as an ASM disk') }}"
+  loop_control:
+    label: "{{ item.item.label }} {{ item.item.device }}-part1"
+  register: _al_created
+
+- name: ASMLib | Reescanear
+  ansible.builtin.command: oracleasm scandisks
+  when: _al_created is changed
+
+- name: ASMLib | Discos ASM visíveis
+  ansible.builtin.command: oracleasm listdisks
+  register: _al_list
+  changed_when: false
+  check_mode: false
+  failed_when: ora_asm.disks | map(attribute='label') | difference(_al_list.stdout_lines) | length > 0

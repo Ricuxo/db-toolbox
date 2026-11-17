@@ -1,0 +1,19 @@
+---
+# Só com decisão explícita do DBA, registrada na mudança. Padrão: aborta.
+ora_gate_allow_existing: false
+
+# Processos de outros SGBD (nome exato do processo; pgrep -x não casa consigo mesmo).
+ora_gate_other_dbms_procs:
+  - mysqld
+  - mariadbd
+  - postgres
+  - postmaster
+  - sqlservr
+  - mongod
+  - db2sysc
+  - redis-server
+  - dataserver
+  - edb-postgres
+
+# Portas de banco conhecidas. 1521 só é aceitável se for do tnslsnr (e isso já indica Oracle).
+ora_gate_db_ports: [1521, 1522, 3306, 5432, 1433, 27017, 50000, 6379]

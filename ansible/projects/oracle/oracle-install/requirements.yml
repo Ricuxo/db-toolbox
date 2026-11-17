@@ -1,0 +1,6 @@
+---
+# Dependências externas mínimas, com versão fixa.
+# Instalar dentro do projeto: ansible-galaxy collection install -r requirements.yml -p collections
+collections:
+  - name: ansible.posix   # mount (/dev/shm), profile_tasks
+    version: 2.2.0

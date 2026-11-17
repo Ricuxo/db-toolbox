@@ -1,0 +1,29 @@
+---
+# orcl02 (VM orcl-02, 192.168.15.151; antes "testeskill") — laboratório para testes. 19c, Oracle Restart, ASM (ASMLib v3), OL 9.8 UEK 8.
+
+# Teste do DBA (fase 20 do oracle-install): mídia deixada em /u01 em vez do stage; a fase recolhe de lá.
+ora_stage_collect_from: [/u01]
+
+# Usados nas etapas seguintes (ASMLib, Grid, banco).
+ora_asm:
+  disks:
+    # Sempre por identificador estável, nunca /dev/sdX ou /dev/nvmeXnY (os nomes mudam entre boots).
+    # Em disco NVMe virtual do VMware usar nvme-eui.* (o caminho nvme-VMware_… repete o serial).
+    # 6ª VM (2026-11-16, discos SCSI): WWN conferido com o ddb.uuid de orcl-02-0.vmdk
+    # (slot scsi0:2, 60G, partição MBR vazia). O /u01 ficou em orcl-02.vmdk (wwn-0x6000c299edf8…).
+    - {label: DATA01, device: /dev/disk/by-id/wwn-0x6000c29fed9d027478749aaf5a6153e1}
+  diskgroups:
+    - {name: DATA, redundancy: EXTERNAL, disks: [DATA01]}
+
+# Banco criado pela fase 60 (decisões do DBA, 2026-11-14). CDB + 1 PDB em ASM, archivelog,
+# FRA no mesmo diskgroup (só existe o DATA no lab).
+ora_db_name: ORCL
+ora_pdb_name: ORCLPDB1
+ora_db_total_memory_mb: 8192      # AUTO_SGA (ASMM); AMM é vedado acima de 4 GB de RAM
+ora_db_fra_size_mb: 20480
+ora_db_redo_size_mb: 512
+
+# Serviços do Restart para as aplicações (fase 65, decisão do DBA, 2026-11-15). Multitenant Guide 19c:
+# "Always use user-defined services for applications"; subir o serviço abre a PDB.
+ora_db_services:
+  - {name: orclpdb1_app, pdb: ORCLPDB1}

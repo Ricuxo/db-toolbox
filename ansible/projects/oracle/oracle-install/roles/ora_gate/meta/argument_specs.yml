@@ -1,0 +1,21 @@
+---
+argument_specs:
+  main:
+    short_description: Gate somente leitura antes de qualquer mudança no servidor.
+    description:
+      - Aborta se o SO estiver fora do escopo, se houver Oracle instalado ou parcial, ou outro SGBD.
+    options:
+      ora_supported_os:
+        type: list
+        elements: dict
+        required: true
+      ora_gate_allow_existing:
+        type: bool
+        default: false
+        description: Prosseguir mesmo com Oracle/outro SGBD. Só com decisão explícita do DBA.
+      ora_gate_other_dbms_procs:
+        type: list
+        elements: str
+      ora_gate_db_ports:
+        type: list
+        elements: int

@@ -1,0 +1,75 @@
+---
+# Gate somente leitura. Todas as tasks rodam também em --check (check_mode: false)
+# porque apenas leem o estado do servidor.
+
+- name: Gate | SO dentro do escopo do projeto
+  ansible.builtin.assert:
+    that:
+      - ora_supported_os
+        | selectattr('distribution', 'equalto', ansible_facts['distribution'])
+        | selectattr('major', 'equalto', ansible_facts['distribution_major_version'] | string)
+        | list | length > 0
+    fail_msg: >-
+      SO {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }} fora do escopo
+      (ora_supported_os). Não prosseguir.
+    quiet: true
+
+- name: Gate | Arquivos que indicam Oracle instalado
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /etc/oraInst.loc
+    - /etc/oratab
+    - /etc/oracle/olr.loc
+    - /etc/oracle/ocr.loc
+  register: _gate_files
+
+- name: Gate | Processos Oracle
+  ansible.builtin.command: pgrep -fa 'ora_pmon_|asm_pmon_|ohasd\.bin|tnslsnr'
+  register: _gate_oracle_procs
+  changed_when: false
+  failed_when: _gate_oracle_procs.rc not in [0, 1]
+  check_mode: false
+
+- name: Gate | Processos de outros SGBD
+  ansible.builtin.command:
+    argv: [pgrep, -ax, "{{ ora_gate_other_dbms_procs | join('|') }}"]
+  register: _gate_other_procs
+  changed_when: false
+  failed_when: _gate_other_procs.rc not in [0, 1]
+  check_mode: false
+
+- name: Gate | Portas de banco em escuta
+  ansible.builtin.command: ss -ltnpH
+  register: _gate_ss
+  changed_when: false
+  check_mode: false
+
+- name: Gate | Consolidar achados
+  ansible.builtin.set_fact:
+    _gate_oracle_found: >-
+      {{ (_gate_files.results | selectattr('stat.exists') | map(attribute='item') | list)
+         + _gate_oracle_procs.stdout_lines }}
+    _gate_other_found: "{{ _gate_other_procs.stdout_lines }}"
+    _gate_ports_found: >-
+      {{ _gate_ss.stdout_lines
+         | select('search', ':(' ~ (ora_gate_db_ports | join('|')) ~ ')\s')
+         | list }}
+
+- name: Gate | Resultado
+  ansible.builtin.debug:
+    msg:
+      - "Oracle existente: {{ _gate_oracle_found | default([], true) or 'nenhum' }}"
+      - "Outro SGBD: {{ _gate_other_found | default([], true) or 'nenhum' }}"
+      - "Portas de banco: {{ _gate_ports_found | default([], true) or 'nenhuma' }}"
+
+- name: Gate | Abortar se o servidor não está limpo
+  ansible.builtin.fail:
+    msg: >-
+      Servidor NÃO está limpo para uma instalação nova
+      (Oracle: {{ _gate_oracle_found | length }}, outro SGBD: {{ _gate_other_found | length }},
+      portas de banco: {{ _gate_ports_found | length }}). Confira o alvo (IP/hostname).
+      Só prossiga com decisão explícita do DBA (ora_gate_allow_existing: true).
+  when:
+    - not ora_gate_allow_existing | bool
+    - (_gate_oracle_found | length > 0) or (_gate_other_found | length > 0) or (_gate_ports_found | length > 0)

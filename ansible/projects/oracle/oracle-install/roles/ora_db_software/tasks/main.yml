@@ -1,0 +1,254 @@
+---
+# Fase 50 — software Oracle Database 19c (INSTALL_DB_SWONLY) num servidor com Oracle Restart.
+# Fontes: 19c rnrdm "Installing Oracle Database 19c (19.32) on Oracle Linux 9 and RHEL 9" (banco em
+# ASM com Restart: runInstaller -applyRU <GIRU> -applyOneOffs ...); 19c ladbi "Installing the Oracle
+# Database Software" ("Run the runInstaller command from the Oracle home directory only"), "Running
+# Oracle Universal Installer Using a Response File" (-silent, caminho absoluto, root.sh como root) e
+# "Preparing Response Files" (dono do instalador, 600).
+# Sem bypass: nunca -ignorePrereq(Failure). O gate é a checagem do próprio runInstaller.
+
+- name: DB software | Caminhos da RU (GIRU) e dos one-offs no stage
+  ansible.builtin.set_fact:
+    _dbsw_ru_dir: "{{ ora_stage_patch_dir }}/{{ ora_media.ru_grid.patchid }}/{{ ora_media.ru_grid.patchid }}"
+    _dbsw_oneoff_dirs: >-
+      {{ (ora_media.oneoffs | default([])) | map(attribute='patchid')
+         | map('regex_replace', '^(.*)$', ora_stage_patch_dir ~ '/\1/\1') | list }}
+
+# ---------- Pré-condições (somente leitura) ----------
+# O rsp fica em /tmp e é apagado no always a partir do controller; se o controller morre no meio,
+# a próxima execução o remove antes de qualquer checagem que possa abortar (como na fase 40).
+- name: DB software | Response files de execuções interrompidas
+  ansible.builtin.find:
+    paths: /tmp
+    patterns: "ora_db_sw_*"
+    file_type: directory
+  register: _dbsw_stale_rsp
+
+- name: DB software | Apagar response files antigos
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ _dbsw_stale_rsp.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: DB software | AVISO — response file antigo encontrado e apagado
+  ansible.builtin.debug:
+    msg: "Execução anterior interrompida deixou {{ _dbsw_stale_rsp.files | map(attribute='path') | join(', ') }} (apagado)."
+  when: _dbsw_stale_rsp.files | length > 0
+
+# ladbi "Installing the Oracle Database Software": "If you plan to use Oracle Restart or Oracle ASM,
+# then you must install Oracle Grid Infrastructure for a standalone server before you install and
+# create the database."
+- name: DB software | Oracle Restart instalado (fase 40)
+  ansible.builtin.stat:
+    path: /etc/oracle/olr.loc
+  register: _dbsw_olr
+
+- name: DB software | Falta o Oracle Restart
+  ansible.builtin.assert:
+    that: _dbsw_olr.stat.exists
+    fail_msg: "/etc/oracle/olr.loc não existe: instale o Grid (fase 40) antes do software do banco."
+    quiet: true
+
+- name: DB software | Instalador ou OPatch em execução
+  ansible.builtin.command: pgrep -u {{ ora_owner }} -f 'runInstaller|gridSetup|opatchauto|OPatch/jre|InstallActions'
+  register: _dbsw_running
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# O inventory.xml já existe (fase 40); sinal é o DB home registrado nele.
+- name: DB software | DB home registrado no inventário
+  ansible.builtin.command:
+    argv: [grep, -F, 'LOC="{{ ora_db_home }}"', "{{ ora_inventory_dir }}/ContentsXML/inventory.xml"]
+  register: _dbsw_in_inventory
+  changed_when: false
+  failed_when: _dbsw_in_inventory.rc > 1
+  check_mode: false
+
+# O .patch_storage sozinho NÃO é sinal: a mídia 19.3 já vem com ele (patches de 2019). Parcial é
+# um sub-patch da RU ou um one-off desta instalação já aplicado no home.
+- name: DB software | Sub-patches da RU (do stage)
+  ansible.builtin.find:
+    paths: "{{ _dbsw_ru_dir }}"
+    file_type: directory
+    patterns: '^[0-9]+$'
+    use_regex: true
+  register: _dbsw_ru_sub
+
+- name: DB software | .patch_storage no home
+  ansible.builtin.stat:
+    path: "{{ ora_db_home }}/.patch_storage"
+  register: _dbsw_ps
+
+- name: DB software | RU ou one-off já aplicado no DB home
+  ansible.builtin.find:
+    paths: "{{ ora_db_home }}/.patch_storage"
+    file_type: directory
+    patterns: >-
+      {{ (_dbsw_ru_sub.files | map(attribute='path') | map('basename') | list
+          + (ora_media.oneoffs | default([]) | map(attribute='patchid') | list))
+         | map('regex_replace', '$', '_*') | list }}
+  register: _dbsw_applied
+  when: _dbsw_ps.stat.isdir | default(false)
+
+- name: DB software | Abortar se o DB home não estiver limpo
+  vars:
+    _found: >-
+      {{ (['inventory.xml registra ' ~ ora_db_home] if _dbsw_in_inventory.rc == 0 else [])
+         + (_dbsw_applied.files | default([]) | map(attribute='path') | list) }}
+  ansible.builtin.assert:
+    that:
+      - _dbsw_running.rc != 0
+      - _found | length == 0
+    fail_msg: >-
+      Esta fase só instala num DB home limpo.
+      {{ ('Processos do instalador em execução: ' ~ (_dbsw_running.stdout_lines | join('; ')) ~ '.')
+         if _dbsw_running.rc == 0 else '' }}
+      {{ ('Encontrado: ' ~ (_found | join(', ')) ~ ' (software instalado ou parcial). Verifique com '
+          ~ ora_db_home ~ '/OPatch/opatch lspatches ou limpe o home antes de reinstalar.')
+         if _found else '' }}
+    quiet: true
+
+- name: DB software | Mídia íntegra no stage
+  ansible.builtin.include_role:
+    name: ora_stage
+    tasks_from: verify
+
+- name: DB software | RU e one-offs extraídos (fase 20)
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ [_dbsw_ru_dir] + _dbsw_oneoff_dirs }}"
+  register: _dbsw_patch_dirs
+
+- name: DB software | Falta extrair patch
+  ansible.builtin.assert:
+    that: _dbsw_patch_dirs.results | rejectattr('stat.exists') | list | length == 0
+    fail_msg: "Patch não extraído: {{ _dbsw_patch_dirs.results | rejectattr('stat.exists') | map(attribute='item') | list }}. Rode a fase 20."
+    quiet: true
+
+# Descompactar e instalar não têm como ser simulados (o home ainda não existe); em --check a fase
+# termina aqui, depois das pré-condições.
+- name: DB software | Fim do --check antes de mexer no DB home
+  ansible.builtin.meta: end_host
+  when: ansible_check_mode
+
+# ---------- Software ----------
+- name: DB software | DB home
+  ansible.builtin.file:
+    path: "{{ ora_db_home }}"
+    state: directory
+    owner: "{{ ora_owner }}"
+    group: "{{ ora_install_group }}"
+    mode: "0775"
+
+- name: DB software | Descompactar a mídia 19.3 no DB home
+  ansible.builtin.unarchive:
+    src: "{{ ora_stage_dir }}/{{ ora_media.db_base.file }}"
+    dest: "{{ ora_db_home }}"
+    remote_src: true
+    creates: "{{ ora_db_home }}/runInstaller"
+  become: true
+  become_user: "{{ ora_owner }}"
+
+- name: DB software | Versão do OPatch no DB home
+  ansible.builtin.command: grep -oP '(?<=OPATCH_VERSION:)\S+' {{ ora_db_home }}/OPatch/version.txt
+  register: _dbsw_opatch
+  changed_when: false
+  check_mode: false
+
+- name: DB software | Guardar o OPatch antigo (abaixo de {{ ora_db_opatch_min }})
+  ansible.builtin.command:
+    argv: [mv, -n, "{{ ora_db_home }}/OPatch", "{{ ora_db_home }}/OPatch.{{ _dbsw_opatch.stdout }}"]
+    creates: "{{ ora_db_home }}/OPatch.{{ _dbsw_opatch.stdout }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  when: _dbsw_opatch.stdout is version(ora_db_opatch_min, '<')
+
+- name: DB software | Instalar o OPatch do stage
+  ansible.builtin.unarchive:
+    src: "{{ ora_stage_dir }}/{{ ora_media.opatch.file }}"
+    dest: "{{ ora_db_home }}"
+    remote_src: true
+    creates: "{{ ora_db_home }}/OPatch/opatch"
+  become: true
+  become_user: "{{ ora_owner }}"
+
+# ---------- Instalação ----------
+- name: DB software | Instalação
+  block:
+    - name: DB software | Diretório temporário do response file
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: ora_db_sw_
+      register: _dbsw_tmp
+
+    - name: DB software | Diretório temporário só do dono
+      ansible.builtin.file:
+        path: "{{ _dbsw_tmp.path }}"
+        owner: "{{ ora_owner }}"
+        group: "{{ ora_install_group }}"
+        mode: "0700"
+
+    - name: DB software | Response file (0600, dono {{ ora_owner }})
+      ansible.builtin.template:
+        src: db_install.rsp.j2
+        dest: "{{ _dbsw_tmp.path }}/db_install.rsp"
+        owner: "{{ ora_owner }}"
+        group: "{{ ora_install_group }}"
+        mode: "0600"
+
+    - name: DB software | runInstaller -silent -applyRU -applyOneOffs (pode levar mais de 1 h)
+      ansible.builtin.command:
+        argv: >-
+          {{ [ora_db_home ~ '/runInstaller', '-silent',
+              '-responseFile', _dbsw_tmp.path ~ '/db_install.rsp',
+              '-applyRU', _dbsw_ru_dir]
+             + (['-applyOneOffs', _dbsw_oneoff_dirs | join(',')] if _dbsw_oneoff_dirs else []) }}
+        chdir: "{{ ora_db_home }}"
+      become: true
+      become_user: "{{ ora_owner }}"
+      async: 10800
+      poll: 60
+      register: _dbsw_setup
+      # rc 6 = instalado com aviso(s). Só passa se TODOS os avisos estiverem em
+      # ora_db_accept_warnings (vazio por padrão: qualquer aviso para a fase).
+      failed_when: >-
+        _dbsw_setup.rc != 0 and not (
+          _dbsw_setup.rc == 6
+          and (_dbsw_setup.stdout | regex_findall('\\[WARNING\\] \\[(INS-[0-9]+)\\]') | length > 0)
+          and (_dbsw_setup.stdout | regex_findall('\\[WARNING\\] \\[(INS-[0-9]+)\\]')
+               | difference(ora_db_accept_warnings) | length == 0))
+
+    # Só roda logo depois do runInstaller desta execução: numa 2ª execução a fase aborta antes.
+    - name: DB software | root.sh
+      ansible.builtin.command: "{{ ora_db_home }}/root.sh"
+      register: _dbsw_root
+      async: 1800
+      poll: 30
+
+  always:
+    - name: DB software | Apagar o response file
+      ansible.builtin.file:
+        path: "{{ _dbsw_tmp.path }}"
+        state: absent
+      when: _dbsw_tmp.path is defined
+
+# ---------- Pós-checagem ----------
+# No DB home a GIRU aplica o sub-patch do banco (ru_db) entre outros; confere-se o que o catálogo
+# identifica sem suposição: a DB RU e cada one-off.
+- name: DB software | Patches no DB home
+  ansible.builtin.command: "{{ ora_db_home }}/OPatch/opatch lspatches"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dbsw_lspatches
+  changed_when: false
+  failed_when: >-
+    _dbsw_lspatches.rc != 0 or
+    ([ora_media.ru_db.patchid] + (ora_media.oneoffs | default([]) | map(attribute='patchid') | list))
+    | difference(_dbsw_lspatches.stdout | regex_findall('(?m)^([0-9]+);')) | length > 0
+
+- name: DB software | Resumo
+  ansible.builtin.debug:
+    msg: "{{ _dbsw_lspatches.stdout_lines }}"

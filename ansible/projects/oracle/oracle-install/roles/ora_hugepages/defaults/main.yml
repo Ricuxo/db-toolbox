@@ -1,0 +1,15 @@
+---
+# Arquivo persistente do vm.nr_hugepages (19c ladbi, "Configuring HugePages on Linux":
+# /etc/sysctl.d/99-nr_hugepages.conf).
+ora_hugepages_sysctl_file: /etc/sysctl.d/99-nr_hugepages.conf
+
+# Margem além das páginas dos segmentos da instância. Lab (2026-11-15): com 3073 (= ceil(SGA)+1) o banco
+# não subiu com ONLY (ORA-27106; a instância pediu 3074). 2 cobre arredondamento e o segmento pequeno
+# do ASM, que sobe antes no boot. NÃO VERIFICADO na doc; validado por reboot no lab.
+ora_hugepages_extra: 2
+
+# Teto da doc: "not more than 70 percent of the total memory for HugePages".
+ora_hugepages_max_pct: 70
+
+# Reference 19c, USE_LARGE_PAGES: ONLY — "Oracle recommends this setting for consistent performance".
+ora_db_use_large_pages: ONLY

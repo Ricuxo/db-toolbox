@@ -1,0 +1,6 @@
+---
+# Oracle Linux 9: comando do guia 19c (página de THP para UEK) para aplicar o
+# GRUB_CMDLINE_LINUX também às entradas BLS. Vale no próximo boot; a role não reinicia.
+- name: Host | Regenerar grub.cfg e entradas BLS
+  ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg --update-bls-cmdline
+  changed_when: true

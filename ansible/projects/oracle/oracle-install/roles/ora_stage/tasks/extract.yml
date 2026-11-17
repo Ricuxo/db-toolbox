@@ -1,0 +1,38 @@
+---
+# Descompacta RU e one-offs em <stage>/patches/<ru>/<patchid>/ para o -applyRU/-applyOneOffs.
+# Idempotente (creates). Nunca apaga nada do stage.
+
+- name: Stage | Patches a extrair
+  ansible.builtin.set_fact:
+    _stage_patches: >-
+      {{ ([ora_media.ru_grid, ora_media.ru_db] + (ora_media.oneoffs | default([])))
+         | unique(attribute='patchid') }}
+
+- name: Stage | Diretórios de extração
+  ansible.builtin.file:
+    path: "{{ ora_stage_patch_dir }}/{{ item.patchid }}"
+    state: directory
+    owner: "{{ ora_owner }}"
+    group: "{{ ora_install_group }}"
+    mode: "0755"
+  loop: "{{ _stage_patches }}"
+  loop_control:
+    label: "{{ item.patchid }}"
+  register: _stage_patch_dirs
+
+- name: Stage | Descompactar patch
+  ansible.builtin.unarchive:
+    src: "{{ ora_stage_dir }}/{{ item.file }}"
+    dest: "{{ ora_stage_patch_dir }}/{{ item.patchid }}"
+    remote_src: true
+    creates: "{{ ora_stage_patch_dir }}/{{ item.patchid }}/{{ item.patchid }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  loop: "{{ _stage_patches }}"
+  loop_control:
+    label: "{{ item.file }} -> {{ ora_stage_patch_dir }}/{{ item.patchid }}"
+  # Em --check o diretório não é criado (e a mídia pode ainda nem estar no stage): o changed da task
+  # anterior já mostra que este patch seria extraído.
+  when: >-
+    not (ansible_check_mode and (_stage_patch_dirs.results
+         | selectattr('item.patchid', 'equalto', item.patchid) | first).changed)

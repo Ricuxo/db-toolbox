@@ -1,0 +1,8 @@
+---
+# Ambientes aceitos. ora_env (inventories/<amb>/group_vars/all/main.yml) tem de ser um destes:
+# um nome fora da lista falha, em vez de passar sem a confirmação de produção.
+ora_env_allowed: [lab, dev, hml, prod]
+
+# true nos playbooks que param ou alteram um banco que já existe (ex.: fase 70, que reinicia o
+# banco). Em prod eles exigem -e ora_confirm_env=prod.
+ora_env_confirm: false

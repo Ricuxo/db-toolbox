@@ -1,0 +1,125 @@
+---
+# Fase 65 — serviços do Oracle Restart para as PDBs.
+# Fontes: 19c Administrator's Guide cap. 4 ("Configuring Automatic Restart of an Oracle Database"):
+# §4.2.11 "Oracle recommends that you use SRVCTL to create and delete database services";
+# §4.5.1.5.1 srvctl add service (-pdb; -policy AUTOMATIC: "automatically started upon restart of the
+# database"). 19c Multitenant Guide, "Managing Services for PDBs": "when you use the SRVCTL utility to
+# start a service with a PDB property for a PDB that is closed, the PDB is opened in read/write mode".
+
+- name: Serviço | Ambiente do banco
+  ansible.builtin.set_fact:
+    _svc_env:
+      ORACLE_HOME: "{{ ora_db_home }}"
+      ORACLE_BASE: "{{ ora_base }}"
+      ORACLE_SID: "{{ ora_db_name }}"
+
+- name: Serviço | Banco registrado no Oracle Restart (fase 60)
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl config database -db {{ ora_db_name }}"
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _svc_db
+  changed_when: false
+  check_mode: false
+  failed_when: _svc_db.rc != 0
+
+- name: Serviço | Configuração atual
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl config service -db {{ ora_db_name }} -service {{ item.name }}"
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  loop: "{{ ora_db_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: _svc_cfg
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# Serviço que já existe com outra PDB não é corrigido aqui: mudar serviço em uso é decisão do DBA.
+- name: Serviço | Existente aponta para a PDB certa
+  ansible.builtin.assert:
+    that: _svc_cfg_pdb | upper == item.item.pdb | upper
+    fail_msg: >-
+      O serviço {{ item.item.name }} já existe com a PDB '{{ _svc_cfg_pdb }}', não
+      '{{ item.item.pdb }}'. Ajuste à mão (srvctl modify service) ou mude ora_db_services.
+    quiet: true
+  vars:
+    _svc_cfg_pdb: "{{ item.stdout | regex_search('Pluggable database name: *(\\S*)', '\\1') | first | default('') }}"
+  loop: "{{ _svc_cfg.results | selectattr('rc', 'equalto', 0) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Serviço | Criar (srvctl add service -pdb -policy AUTOMATIC)
+  ansible.builtin.command:
+    argv:
+      - "{{ ora_db_home }}/bin/srvctl"
+      - add
+      - service
+      - -db
+      - "{{ ora_db_name }}"
+      - -service
+      - "{{ item.item.name }}"
+      - -pdb
+      - "{{ item.item.pdb }}"
+      - -policy
+      - AUTOMATIC
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  loop: "{{ _svc_cfg.results | rejectattr('rc', 'equalto', 0) }}"
+  loop_control:
+    label: "{{ item.item.name }} → {{ item.item.pdb }}"
+
+- name: Serviço | Estado
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl status service -db {{ ora_db_name }} -service {{ item.name }}"
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  loop: "{{ ora_db_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: _svc_status
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Serviço | Subir (abre a PDB em READ WRITE)
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl start service -db {{ ora_db_name }} -service {{ item.item.name }}"
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  loop: "{{ _svc_status.results | rejectattr('stdout', 'search', 'is running') }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+# ---------- Pós-checagem ----------
+- name: Serviço | Rodando e PDB aberta
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      set heading off feedback off pagesize 0 linesize 200
+      select 'SVC='||lower(s.name)||'|'||upper(p.name)||'|'||p.open_mode
+        from v$active_services s join v$pdbs p on p.con_id = s.con_id;
+      exit
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _svc_sql
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Serviço | Conferência
+  ansible.builtin.assert:
+    that: ('SVC=' ~ (item.name | lower) ~ '|' ~ (item.pdb | upper) ~ '|READ WRITE') in _svc_sql.stdout_lines
+    fail_msg: "Serviço {{ item.name }} não está ativo com a PDB {{ item.pdb }} em READ WRITE: {{ _svc_sql.stdout_lines }}"
+    quiet: true
+  loop: "{{ ora_db_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: not ansible_check_mode
+
+- name: Serviço | Resumo
+  ansible.builtin.debug:
+    msg: "{{ _svc_sql.stdout_lines }}"
+  when: not ansible_check_mode

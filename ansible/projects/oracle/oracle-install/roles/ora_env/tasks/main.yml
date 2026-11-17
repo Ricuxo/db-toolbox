@@ -1,0 +1,35 @@
+---
+# Guarda de ambiente: roda antes de tudo em cada playbook. Só leitura.
+
+- name: Ambiente | ora_env definido no inventário
+  ansible.builtin.assert:
+    that:
+      - ora_env is defined
+      - ora_env in ora_env_allowed
+    fail_msg: >-
+      ora_env {{ ('= "' ~ ora_env ~ '" não está em ' ~ ora_env_allowed) if ora_env is defined
+      else 'não definido' }}. Ele vem de inventories/<amb>/group_vars/all/main.yml: confira o -i.
+    quiet: true
+
+# O ambiente é dito num lugar só: o diretório do -i. Pega o "-e ora_env=..." que mascara o
+# inventário e o inventories/prod copiado do lab sem trocar o ora_env.
+- name: Ambiente | ora_env igual ao diretório do inventário
+  ansible.builtin.assert:
+    that: ora_env == (inventory_dir | basename)
+    fail_msg: >-
+      ora_env={{ ora_env }}, mas o inventário deste host é {{ inventory_dir }}. O ambiente vem do
+      -i: não passe ora_env por -e, e confira o ora_env em group_vars/all/main.yml.
+    quiet: true
+
+- name: Ambiente | Alvo desta execução
+  ansible.builtin.debug:
+    msg: "Ambiente {{ ora_env | upper }} — {{ inventory_hostname }} ({{ ansible_host | default(inventory_hostname) }})"
+
+- name: Ambiente | Confirmação para alterar banco existente em produção
+  ansible.builtin.assert:
+    that: ora_confirm_env | default('') == ora_env
+    fail_msg: >-
+      Este playbook para ou altera um banco que já existe, e o ambiente é {{ ora_env | upper }}.
+      Para seguir, repita o ambiente na linha de comando: -e ora_confirm_env={{ ora_env }}
+    quiet: true
+  when: ora_env_confirm | bool and ora_env == 'prod'

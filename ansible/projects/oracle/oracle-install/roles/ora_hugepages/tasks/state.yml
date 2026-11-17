@@ -1,0 +1,98 @@
+---
+# Lê o estado do banco e da memória (somente leitura). Chamado antes e depois de cada reinício.
+- name: HugePages | Parâmetros do banco
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      set heading off feedback off pagesize 0
+      select 'SGA_MAX='||value from v$parameter where name='sga_max_size';
+      select 'ULP_MEM='||upper(value) from v$parameter where name='use_large_pages';
+      select 'ULP_SPFILE='||upper(nvl(value,'TRUE')) from v$spparameter where name='use_large_pages';
+      select 'MEMORY_TARGET='||value from v$parameter where name='memory_target';
+      select 'ALERT='||d.value||'/alert_'||i.instance_name||'.log' from v$diag_info d, v$instance i where d.name='Diag Trace';
+      exit
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _hp_sql
+  changed_when: false
+  check_mode: false
+
+- name: HugePages | Memória do servidor
+  ansible.builtin.command: grep -E '^(MemTotal|HugePages_Total|HugePages_Free|HugePages_Rsvd|Hugepagesize):' /proc/meminfo
+  register: _hp_meminfo
+  changed_when: false
+  check_mode: false
+
+# Segmentos de memória compartilhada da instância, pelo sysresv do próprio Oracle home; cada um
+# arredondado para cima em HugePages (mesma lógica do script da MOS 401749.1). No lab: 3074 páginas,
+# igual ao EXPECTED_PAGES que a instância pediu com USE_LARGE_PAGES=ONLY (com TRUE ela pedia 3073 e
+# usava mais 15 páginas de 4K — por isso só o sga_max_size não basta).
+- name: HugePages | Segmentos de memória compartilhada da instância (sysresv)
+  ansible.builtin.shell: |
+    set -o pipefail
+    hp_bytes=$(( $(awk '/^Hugepagesize:/{print $2}' /proc/meminfo) * 1024 ))
+    ids=$({{ ora_db_home }}/bin/sysresv -l {{ ora_db_name }} \
+          | awk '/^Shared Memory:/{f=1;next} /^Semaphores:/{f=0} f && $1 ~ /^[0-9]+$/ {print $1}')
+    [ -n "$ids" ] || { echo "sysresv não listou segmentos de {{ ora_db_name }}" >&2; exit 1; }
+    ipcs -m | awk -v ids="$ids" -v hp="$hp_bytes" \
+      'BEGIN{n=split(ids,a); for(i=1;i<=n;i++) w[a[i]]=1}
+       ($2 in w){p+=int(($5+hp-1)/hp); c++} END{printf "SHM_PAGES=%d\nSHM_SEGMENTS=%d\n", p, c}'
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _hp_shm
+  changed_when: false
+  check_mode: false
+
+# Tabela que a instância grava no alert log a cada partida (PAGESIZE AVAILABLE_PAGES EXPECTED_PAGES
+# ALLOCATED_PAGES ERROR(s)); lê a linha das HugePages da ÚLTIMA partida. Com USE_LARGE_PAGES=TRUE a
+# instância põe de propósito o segmento pequeno em páginas de 4K (lab 2026-11-16: 2048K esperado 3073 =
+# alocado 3073, 4K 15, com 3076 livres; com ONLY ela pede 3074), então em TRUE a prova de que o SGA
+# foi para HugePages é o próprio Oracle: EXPECTED = ALLOCATED e ERROR(s) NONE.
+- name: HugePages | Tabela de páginas da última partida (alert log)
+  vars:
+    _alert: "{{ _hp_sql.stdout_lines | select('match', '^ALERT=') | first | regex_replace('^ALERT=', '') }}"
+  ansible.builtin.shell: |
+    set -o pipefail
+    a='{{ _alert }}'
+    n=$(grep -n 'Starting ORACLE instance' "$a" | tail -1 | cut -d: -f1)
+    [ -n "$n" ] || { echo "sem 'Starting ORACLE instance' em $a" >&2; exit 1; }
+    tail -n +"$n" "$a" | awk -v ps="$(awk '/^Hugepagesize:/{print $2}' /proc/meminfo)K" \
+      '$1 == ps && NF >= 5 {printf "ALERT_EXPECTED=%s\nALERT_ALLOCATED=%s\nALERT_ERROR=%s\n", $3, $4, $5; exit}'
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _hp_alert
+  changed_when: false
+  check_mode: false
+
+# Páginas comprometidas = Total - Free + Rsvd (as reservadas ainda contam como livres).
+- name: HugePages | Estado consolidado
+  vars:
+    _db: "{{ dict(_hp_sql.stdout_lines | select('search', '^[A-Z_]+=') | map('split', '=', 1) | list) }}"
+    _shm: "{{ dict(_hp_shm.stdout_lines | map('split', '=', 1) | list) }}"
+    _al: "{{ dict(_hp_alert.stdout_lines | map('split', '=', 1) | list) }}"
+    _mi: "{{ dict(_hp_meminfo.stdout_lines | map('regex_replace', '^(\\S+):\\s+(\\d+).*$', '\\1=\\2') | map('split', '=', 1) | list) }}"
+  ansible.builtin.set_fact:
+    _hp:
+      sga_max: "{{ _db.SGA_MAX | int }}"
+      ulp_mem: "{{ _db.ULP_MEM }}"
+      ulp_spfile: "{{ _db.ULP_SPFILE }}"
+      memory_target: "{{ _db.MEMORY_TARGET | int }}"
+      mem_total_kb: "{{ _mi.MemTotal | int }}"
+      page_kb: "{{ _mi.Hugepagesize | int }}"
+      total: "{{ _mi.HugePages_Total | int }}"
+      committed: "{{ _mi.HugePages_Total | int - _mi.HugePages_Free | int + _mi.HugePages_Rsvd | int }}"
+      shm_pages: "{{ _shm.SHM_PAGES | int }}"
+      alert_expected: "{{ _al.ALERT_EXPECTED | default(0) | int }}"
+      alert_allocated: "{{ _al.ALERT_ALLOCATED | default(0) | int }}"
+      alert_error: "{{ _al.ALERT_ERROR | default('(sem linha das HugePages no alert log)') }}"
+
+# SGA em HugePages: com ONLY, todas as páginas dos segmentos comprometidas; nos outros modos, o que a
+# instância esperava pôr em HugePages foi alocado sem erro (tabela do alert log).
+- name: HugePages | SGA em HugePages?
+  ansible.builtin.set_fact:
+    _hp_sga_ok: >-
+      {{ (_hp.committed | int >= _hp.shm_pages | int) if _hp.ulp_mem == 'ONLY'
+         else (_hp.alert_allocated | int > 0 and _hp.alert_allocated | int == _hp.alert_expected | int
+               and _hp.alert_error == 'NONE') }}
