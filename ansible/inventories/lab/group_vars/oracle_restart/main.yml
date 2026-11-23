@@ -1,0 +1,3 @@
+---
+# Cenário Oracle Restart + ASM: Grid standalone (fase 40) com ASMLib v3 (fase 30); banco em ASM.
+ora_install_type: restart_asm

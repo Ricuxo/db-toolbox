@@ -3,7 +3,7 @@
 # Aborta se: SO fora do escopo, Oracle instalado/parcial ou outro SGBD.
 # A mídia é verificada na fase 20: o stage só existe depois da fase 10.
 - name: Gate do servidor
-  hosts: "{{ ora_hosts | default('oracle_restart') }}"
+  hosts: "{{ ora_hosts | default('oracle') }}"
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:

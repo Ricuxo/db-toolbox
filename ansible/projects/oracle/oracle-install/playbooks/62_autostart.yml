@@ -1,0 +1,14 @@
+---
+# Fase 62 — banco e listener no boot sem Grid (cenário si_fs): oratab Y e dbora. Não reinicia nada.
+- name: Início automático do banco (sem Grid)
+  hosts: "{{ ora_hosts | default('oracle_si') }}"
+  gather_facts: true
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Guarda de ambiente
+      ansible.builtin.import_role:
+        name: ora_env
+      tags: [always]                # roda mesmo com --tags/--skip-tags
+  roles:
+    - role: ora_autostart
+      tags: [autostart]

@@ -1,0 +1,13 @@
+---
+argument_specs:
+  main:
+    short_description: Listener do próprio DB home (cenário si_fs, sem Grid) com netca silencioso.
+    description:
+      - netca -silent -responsefile com o template do home (assistants/netca/netca.rsp, LISTENER em TCP 1521).
+      - Recusa se a porta 1521 estiver em uso por outro processo; idempotente.
+    options:
+      ora_owner: {type: str, required: true}
+      ora_install_group: {type: str, required: true}
+      ora_base: {type: path, required: true}
+      ora_db_home: {type: path, required: true}
+      ora_install_type: {type: str, required: true}

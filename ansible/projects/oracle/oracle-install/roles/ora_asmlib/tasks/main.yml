@@ -6,6 +6,14 @@
 #     partitioned" → uma partição GPT ocupando o disco todo (decisão do DBA, 2026-11-13).
 
 # ---------- Pré-condições (somente leitura) ----------
+- name: ASMLib | Só no cenário Restart + ASM
+  ansible.builtin.assert:
+    that: ora_install_type == 'restart_asm'
+    fail_msg: >-
+      Esta fase é do cenário restart_asm, e o host está em {{ ora_install_type }} (grupo do
+      inventário). Em si_fs não há ASMLib nem Grid.
+    quiet: true
+
 - name: ASMLib | Discos por identificador estável
   ansible.builtin.assert:
     that: ora_asm.disks | rejectattr('device', 'match', '^/dev/disk/by-id/') | list | length == 0

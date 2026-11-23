@@ -1,17 +1,35 @@
 ---
-# Reinício do banco pelo Oracle Restart (19c Admin Guide cap. 4: srvctl stop/start database).
-# Os serviços com policy AUTOMATIC sobem junto e reabrem as PDBs (fase 65).
+# Reinício do banco.
+# restart_asm: pelo Oracle Restart (19c Admin Guide cap. 4: srvctl stop/start database); os serviços
+#   com policy AUTOMATIC sobem junto e reabrem as PDBs (fase 65).
+# si_fs: sem Restart, SHUTDOWN IMMEDIATE e STARTUP no SQL*Plus (os comandos do próprio dbshut/dbstart);
+#   a PDB reabre pelo SAVE STATE (fase 65). O state.yml em seguida falha se a instância não subir.
 - name: HugePages | Parar o banco ({{ _hp_reason }})
   ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl stop database -db {{ ora_db_name }} -stopoption IMMEDIATE"
   environment: "{{ _hp_env }}"
   become: true
   become_user: "{{ ora_owner }}"
+  when: ora_install_type == 'restart_asm'
 
 - name: HugePages | Subir o banco
   ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl start database -db {{ ora_db_name }}"
   environment: "{{ _hp_env }}"
   become: true
   become_user: "{{ ora_owner }}"
+  when: ora_install_type == 'restart_asm'
+
+- name: HugePages | Parar e subir o banco pelo SQL*Plus ({{ _hp_reason }}, si_fs)
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      whenever sqlerror exit failure
+      shutdown immediate
+      startup
+      exit
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  when: ora_install_type == 'si_fs'
 
 - name: HugePages | Estado depois do reinício
   ansible.builtin.include_tasks: state.yml

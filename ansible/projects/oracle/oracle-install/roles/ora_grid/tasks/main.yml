@@ -5,6 +5,14 @@
 # "Installing Oracle Database 19c (19.32) on Oracle Linux 9 and RHEL 9" (-applyRU/-applyOneOffs).
 # Sem bypass: nunca -ignorePrereq(Failure). O gate é a checagem do próprio gridSetup com a RU aplicada.
 
+- name: Grid | Só no cenário Restart + ASM
+  ansible.builtin.assert:
+    that: ora_install_type == 'restart_asm'
+    fail_msg: >-
+      Esta fase é do cenário restart_asm, e o host está em {{ ora_install_type }} (grupo do
+      inventário). Em si_fs não há ASMLib nem Grid.
+    quiet: true
+
 - name: Grid | Diskgroup criado na instalação (o primeiro de ora_asm)
   ansible.builtin.set_fact:
     _grid_dg: "{{ ora_asm.diskgroups[0] }}"

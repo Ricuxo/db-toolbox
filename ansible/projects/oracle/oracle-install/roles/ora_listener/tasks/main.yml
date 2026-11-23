@@ -1,0 +1,125 @@
+---
+# Fase 55 — listener do DB home, só em si_fs (sem Grid, o listener não vem do Restart).
+# Fonte: 19c ladbi "Running Configuration Assistants Using Response Files", seção "Running Net
+# Configuration Assistant Using Response Files": "Oracle provides a response file template named
+# netca.rsp in the $ORACLE_HOME/assistants/netca directory"; cp do template e
+# "$ORACLE_HOME/bin/netca -silent -responsefile /local_directory/netca.rsp". O template da 19.3 já
+# define LISTENER em TCP 1521 (LISTENER_NAMES={"LISTENER"}, LISTENER_PROTOCOLS={"TCP;1521"}).
+
+- name: Listener | Só no cenário si_fs
+  ansible.builtin.assert:
+    that: ora_install_type == 'si_fs'
+    fail_msg: "Em {{ ora_install_type }} o listener é do Grid/Restart (fase 40); esta fase é do si_fs."
+    quiet: true
+
+- name: Listener | Ambiente do DB home
+  ansible.builtin.set_fact:
+    _lsn_env:
+      ORACLE_HOME: "{{ ora_db_home }}"
+      ORACLE_BASE: "{{ ora_base }}"
+
+- name: Listener | netca no DB home (fase 50)
+  ansible.builtin.stat:
+    path: "{{ ora_db_home }}/bin/netca"
+  register: _lsn_netca
+
+- name: Listener | Falta o software do banco
+  ansible.builtin.assert:
+    that: _lsn_netca.stat.exists
+    fail_msg: "{{ ora_db_home }}/bin/netca não existe: rode a fase 50."
+    quiet: true
+
+- name: Listener | Quem escuta na porta 1521
+  ansible.builtin.command: ss -Hltnp 'sport = :1521'
+  register: _lsn_port
+  changed_when: false
+  check_mode: false
+
+- name: Listener | Porta 1521 livre ou do tnslsnr
+  ansible.builtin.assert:
+    that: _lsn_port.stdout | length == 0 or 'tnslsnr' in _lsn_port.stdout
+    fail_msg: "A porta 1521 está em uso por outro processo: {{ _lsn_port.stdout }}. Confira o servidor; esta fase não para nada."
+    quiet: true
+
+- name: Listener | listener.ora do home
+  ansible.builtin.stat:
+    path: "{{ ora_db_home }}/network/admin/listener.ora"
+  register: _lsn_ora
+
+- name: Listener | Estado do LISTENER
+  ansible.builtin.command: "{{ ora_db_home }}/bin/lsnrctl status LISTENER"
+  environment: "{{ _lsn_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _lsn_status
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# Configurado mas parado (ex.: depois de um boot sem a fase 62): só sobe.
+- name: Listener | Subir o LISTENER existente
+  ansible.builtin.command: "{{ ora_db_home }}/bin/lsnrctl start LISTENER"
+  environment: "{{ _lsn_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  when:
+    - _lsn_ora.stat.exists
+    - _lsn_status.rc != 0
+
+- name: Listener | Configurar com o netca
+  when: not _lsn_ora.stat.exists
+  block:
+    - name: Listener | Diretório temporário do response file
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: ora_netca_
+      register: _lsn_tmp
+
+    - name: Listener | Diretório temporário do dono
+      ansible.builtin.file:
+        path: "{{ _lsn_tmp.path }}"
+        owner: "{{ ora_owner }}"
+        group: "{{ ora_install_group }}"
+        mode: "0700"
+      when: _lsn_tmp.path is defined
+
+    - name: Listener | Cópia do template netca.rsp do home (como na doc)
+      ansible.builtin.copy:
+        src: "{{ ora_db_home }}/assistants/netca/netca.rsp"
+        dest: "{{ _lsn_tmp.path }}/netca.rsp"
+        remote_src: true
+        owner: "{{ ora_owner }}"
+        group: "{{ ora_install_group }}"
+        mode: "0600"
+      when: _lsn_tmp.path is defined
+
+    - name: Listener | netca -silent -responsefile
+      ansible.builtin.command:
+        argv: ["{{ ora_db_home }}/bin/netca", -silent, -responsefile, "{{ _lsn_tmp.path }}/netca.rsp"]
+      environment: "{{ _lsn_env }}"
+      become: true
+      become_user: "{{ ora_owner }}"
+      register: _lsn_netca_run
+      when: _lsn_tmp.path is defined
+  always:
+    - name: Listener | Apagar o response file
+      ansible.builtin.file:
+        path: "{{ _lsn_tmp.path }}"
+        state: absent
+      when: _lsn_tmp.path is defined
+
+# ---------- Pós-checagem ----------
+- name: Listener | LISTENER no ar na 1521
+  ansible.builtin.command: "{{ ora_db_home }}/bin/lsnrctl status LISTENER"
+  environment: "{{ _lsn_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _lsn_final
+  changed_when: false
+  failed_when: _lsn_final.rc != 0 or 'PORT=1521' not in _lsn_final.stdout
+  when: not ansible_check_mode
+
+- name: Listener | Resumo
+  ansible.builtin.debug:
+    msg: "{{ _lsn_final.stdout_lines | select('search', 'Alias|Start Date|Listener Parameter|Listening Endpoints|DESCRIPTION') | list }}"
+  when: not ansible_check_mode

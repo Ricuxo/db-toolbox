@@ -1,0 +1,13 @@
+---
+argument_specs:
+  main:
+    short_description: Banco e listener subindo no boot sem Grid (cenário si_fs) com dbstart/dbshut e dbora.
+    description:
+      - Y no /etc/oratab para o banco e /etc/init.d/dbora da doc com os links rc0/rc3/rc5.
+      - Não reinicia nada; o efeito aparece no próximo boot.
+    options:
+      ora_owner: {type: str, required: true}
+      ora_db_home: {type: path, required: true}
+      ora_db_name: {type: str, required: true}
+      ora_install_type: {type: str, required: true}
+      ora_autostart_osdba_group: {type: str}

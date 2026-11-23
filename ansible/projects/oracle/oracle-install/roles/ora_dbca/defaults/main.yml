@@ -7,9 +7,10 @@ ora_dbca_template: General_Purpose.dbc
 ora_db_charset: AL32UTF8
 ora_db_ncharset: AL16UTF16
 
-# Diskgroup dos datafiles e da FRA (o primeiro de ora_asm, criado na fase 40).
-ora_db_diskgroup: "{{ ora_asm.diskgroups[0].name }}"
-ora_db_fra_diskgroup: "{{ ora_asm.diskgroups[0].name }}"
+# Diskgroup dos datafiles e da FRA (restart_asm: o primeiro de ora_asm, criado na fase 40).
+# Em si_fs valem ora_db_data_dir e ora_db_fra_dir (inventário, group_vars/oracle_si).
+ora_db_diskgroup: "{{ ora_asm.diskgroups[0].name if ora_asm is defined else '' }}"
+ora_db_fra_diskgroup: "{{ ora_db_diskgroup }}"
 
 ora_db_archivelog: true
 

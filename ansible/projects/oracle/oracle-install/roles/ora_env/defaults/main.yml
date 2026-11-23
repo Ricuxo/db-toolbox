@@ -3,6 +3,10 @@
 # um nome fora da lista falha, em vez de passar sem a confirmação de produção.
 ora_env_allowed: [lab, dev, hml, prod]
 
+# Cenários de instalação. ora_install_type vem do grupo do inventário
+# (inventories/<amb>/group_vars/<grupo>/main.yml): oracle_restart → restart_asm, oracle_si → si_fs.
+ora_install_types: [restart_asm, si_fs]
+
 # true nos playbooks que param ou alteram um banco que já existe (ex.: fase 70, que reinicia o
 # banco). Em prod eles exigem -e ora_confirm_env=prod.
 ora_env_confirm: false

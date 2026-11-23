@@ -14,9 +14,15 @@ sysPassword={{ vault_ora_sys_password | trim }}
 systemPassword={{ vault_ora_system_password | trim }}
 pdbAdminPassword={{ vault_ora_pdbadmin_password | trim }}
 emConfiguration=NONE
+{% if ora_install_type == 'restart_asm' %}
 storageType=ASM
 diskGroupName={{ ora_db_diskgroup }}
 recoveryGroupName={{ ora_db_fra_diskgroup }}
+{% else %}
+storageType=FS
+datafileDestination={{ ora_db_data_dir }}
+recoveryAreaDestination={{ ora_db_fra_dir }}
+{% endif %}
 characterSet={{ ora_db_charset }}
 nationalCharacterSet={{ ora_db_ncharset }}
 sampleSchema=false

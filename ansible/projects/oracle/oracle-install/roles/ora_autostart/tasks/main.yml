@@ -1,0 +1,59 @@
+---
+# Fase 62 — banco e listener subindo no boot, só em si_fs (sem Oracle Restart).
+# Fonte: 19c Administrator's Reference for Linux and UNIX-Based Operating Systems, §2.2.1
+# "Automating Database Startup and Shutdown": oratab "$ORACLE_SID:$ORACLE_HOME:<N|Y>" ("change the
+# last field for each to Y"); dbora em /etc/init.d ("chgrp dba dbora", "chmod 750 dbora"); links
+# /etc/rc.d/rc0.d/K01dbora, rc3.d/S99dbora e rc5.d/S99dbora. O dbstart $ORACLE_HOME sobe também o
+# listener do home (ORACLE_HOME_LISTNER=$1 no próprio script).
+# No OL9 o systemd-sysv-generator transforma o dbora em unidade no boot (chkconfig e initscripts
+# presentes). Esta fase não reinicia nada: o efeito se prova no próximo reboot.
+
+- name: Autostart | Só no cenário si_fs
+  ansible.builtin.assert:
+    that: ora_install_type == 'si_fs'
+    fail_msg: "Em {{ ora_install_type }} quem sobe o banco no boot é o Oracle Restart; esta fase é do si_fs."
+    quiet: true
+
+- name: Autostart | Entrada do banco no oratab (fase 60)
+  ansible.builtin.command: grep -E '^{{ ora_db_name }}:' /etc/oratab
+  register: _as_oratab
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Autostart | Banco no oratab, com o home certo
+  ansible.builtin.assert:
+    that:
+      - _as_oratab.rc == 0
+      - _as_oratab.stdout_lines | length == 1
+      - _as_oratab.stdout.split(':')[1] == ora_db_home
+    fail_msg: >-
+      /etc/oratab sem uma linha única '{{ ora_db_name }}:{{ ora_db_home }}:...' (encontrado:
+      {{ _as_oratab.stdout_lines }}). Rode a fase 60 ou confira o oratab à mão; esta fase não troca o home.
+    quiet: true
+
+- name: Autostart | Y no oratab
+  ansible.builtin.lineinfile:
+    path: /etc/oratab
+    regexp: '^{{ ora_db_name }}:'
+    line: "{{ ora_db_name }}:{{ ora_db_home }}:Y"
+
+- name: Autostart | /etc/init.d/dbora (texto da doc)
+  ansible.builtin.template:
+    src: dbora.j2
+    dest: /etc/init.d/dbora
+    owner: root
+    group: "{{ ora_autostart_osdba_group }}"
+    mode: "0750"
+  register: _as_dbora
+
+- name: Autostart | Links de início e parada
+  ansible.builtin.file:
+    src: /etc/init.d/dbora
+    dest: "{{ item }}"
+    state: link
+  loop:
+    - /etc/rc.d/rc0.d/K01dbora
+    - /etc/rc.d/rc3.d/S99dbora
+    - /etc/rc.d/rc5.d/S99dbora
+  when: not (ansible_check_mode and _as_dbora is changed)   # em --check o dbora ainda não existe

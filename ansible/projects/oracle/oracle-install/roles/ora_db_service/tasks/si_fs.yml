@@ -1,0 +1,126 @@
+---
+# Cenário si_fs (sem Oracle Restart): DBMS_SERVICE na PDB e SAVE STATE no root.
+# 19c Multitenant Guide, "Managing Services for PDBs": "When you create a service with the
+# DBMS_SERVICE package, the PDB property of the service is set to the current container"; START_SERVICE
+# sobe o serviço. "Preserving or Discarding the Open Mode of PDBs When the CDB Restarts": "Specify
+# SAVE STATE to preserve the PDBs' mode when the CDB is restarted."
+# NÃO DOCUMENTADO nas páginas lidas: se o estado salvo também religa os serviços de usuário no boot.
+# A fase 70 e o reboot do laboratório conferem; a fase 65 rodada de novo sobe o que faltar.
+
+- name: Serviço | Estado atual (si_fs)
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      whenever sqlerror exit failure
+      set heading off feedback off pagesize 0 linesize 200
+      select 'INST='||status from v$instance;
+      select 'PDB='||upper(name)||'|'||open_mode from v$pdbs;
+      select 'CFG='||lower(s.name)||'|'||upper(p.name) from cdb_services s join v$pdbs p on p.con_id = s.con_id;
+      select 'ACT='||lower(s.name) from v$active_services s;
+      select 'SAVED='||upper(con_name)||'|'||state from dba_pdb_saved_states;
+      exit
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _svc_fs
+  changed_when: false
+  check_mode: false
+
+- name: Serviço | Banco aberto (fase 60)
+  ansible.builtin.assert:
+    that: "'INST=OPEN' in _svc_fs.stdout_lines"
+    fail_msg: "O banco {{ ora_db_name }} não está aberto: {{ _svc_fs.stdout_lines }}"
+    quiet: true
+
+- name: Serviço | Classificar
+  ansible.builtin.set_fact:
+    _svc_cfg_fs: >-
+      {{ dict(_svc_fs.stdout_lines | select('match', '^CFG=') | map('regex_replace', '^CFG=', '')
+              | map('split', '|') | list) }}
+    _svc_act_fs: "{{ _svc_fs.stdout_lines | select('match', '^ACT=') | map('regex_replace', '^ACT=', '') | list }}"
+    _svc_pdb_fs: >-
+      {{ dict(_svc_fs.stdout_lines | select('match', '^PDB=') | map('regex_replace', '^PDB=', '')
+              | map('split', '|') | list) }}
+    _svc_saved_fs: "{{ _svc_fs.stdout_lines | select('match', '^SAVED=') | map('regex_replace', '^SAVED=', '') | list }}"
+
+# Serviço que já existe com outra PDB não é corrigido aqui: mudar serviço em uso é decisão do DBA.
+- name: Serviço | Existente aponta para a PDB certa
+  ansible.builtin.assert:
+    that: _svc_cfg_fs[item.name | lower] == item.pdb | upper
+    fail_msg: >-
+      O serviço {{ item.name }} já existe com a PDB '{{ _svc_cfg_fs[item.name | lower] }}', não
+      '{{ item.pdb }}'. Ajuste à mão (DBMS_SERVICE) ou mude ora_db_services.
+    quiet: true
+  loop: "{{ ora_db_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: (item.name | lower) in _svc_cfg_fs
+
+- name: Serviço | PDB existe
+  ansible.builtin.assert:
+    that: (item.pdb | upper) in _svc_pdb_fs
+    fail_msg: "A PDB {{ item.pdb }} não existe no banco {{ ora_db_name }}: {{ _svc_pdb_fs }}"
+    quiet: true
+  loop: "{{ ora_db_services }}"
+  loop_control:
+    label: "{{ item.pdb }}"
+
+- name: Serviço | Abrir a PDB (READ WRITE)
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      whenever sqlerror exit failure
+      alter pluggable database {{ item }} open read write;
+      exit
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  loop: "{{ ora_db_services | map(attribute='pdb') | map('upper') | unique
+            | reject('in', _svc_pdb_fs | dict2items | selectattr('value', 'equalto', 'READ WRITE')
+                                       | map(attribute='key') | list) | list }}"
+
+- name: Serviço | Criar (DBMS_SERVICE.CREATE_SERVICE na PDB)
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      whenever sqlerror exit failure
+      alter session set container = {{ item.pdb | upper }};
+      exec dbms_service.create_service(service_name => '{{ item.name | lower }}', network_name => '{{ item.name | lower }}')
+      exit
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  loop: "{{ ora_db_services }}"
+  loop_control:
+    label: "{{ item.name }} → {{ item.pdb }}"
+  when: (item.name | lower) not in _svc_cfg_fs
+
+- name: Serviço | Subir (DBMS_SERVICE.START_SERVICE)
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      whenever sqlerror exit failure
+      alter session set container = {{ item.pdb | upper }};
+      exec dbms_service.start_service(service_name => '{{ item.name | lower }}')
+      exit
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  loop: "{{ ora_db_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: (item.name | lower) not in _svc_act_fs
+
+# Com a PDB aberta, o estado salvo passa a ser OPEN e ela reabre quando o CDB reinicia.
+- name: Serviço | Salvar o estado aberto da PDB (SAVE STATE)
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      whenever sqlerror exit failure
+      alter pluggable database {{ item }} save state;
+      exit
+  environment: "{{ _svc_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  loop: "{{ ora_db_services | map(attribute='pdb') | map('upper') | unique | list }}"
+  when: (item ~ '|OPEN') not in _svc_saved_fs

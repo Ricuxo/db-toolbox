@@ -11,11 +11,18 @@ Como saber até onde o servidor chegou. Os caminhos saem do inventário: `ora_gr
 | 30 | `oracleasm listdisks` lista todos os labels de `ora_asm.disks`; `oracleasm status` ok | Disco com `-part1` sem label ASM; label diferente do declarado (a fase recusa) |
 | 40 | `/etc/oracle/olr.loc` existe; `inventory.xml` tem um `HOME` com `LOC="<ora_grid_home>"` e `CRS="true"`; `crsctl stat res -t` mostra `ora.asm` ONLINE | Grid home com sub-patch da GIRU ou one-off em `.patch_storage/<id>_*` **sem** `olr.loc`; processo `gridSetup`/`OPatch` rodando; `/tmp/ora_grid_*` (rsp com senha de execução interrompida: a fase apaga) |
 | 50 | `inventory.xml` tem um `HOME` com `LOC="<ora_db_home>"`; `opatch lspatches` do DB home lista a DB RU e os one-offs | DB home com arquivos e fora do `inventory.xml`; `/tmp/ora_db_sw_*` |
+| 55 (`si_fs`) | `lsnrctl status LISTENER` do DB home responde com `PORT=1521`; `$ORACLE_HOME/network/admin/listener.ora` existe | `listener.ora` sem listener no ar (a fase só sobe); `/tmp/ora_netca_*` |
 | 60 | `srvctl config database -db <DB>` responde; o `<DB>` está no `/etc/oratab`; `+<DG>/<DB>` existe no ASM | `cfgtoollogs/dbca/<DB>` existe sem banco registrado; `pmon` sem registro no Restart (`pgrep -f "^ora_pmon_<SID>"` com o SID do oratab, `ora_pmon_ORCL` no lab; o `comm` do processo fica em minúsculas) |
+| 62 (`si_fs`) | `/etc/oratab` com `<DB>:<home>:Y`; `/etc/init.d/dbora` (root:dba 0750) e os links `rc0.d/K01dbora`, `rc3.d/S99dbora`, `rc5.d/S99dbora` | oratab ainda com `N` |
 | 65 | `srvctl config service -db <DB>` lista cada `ora_db_services[].name` com a PDB certa | Serviço com outra PDB (a fase recusa e não altera) |
 | 70 | `/etc/sysctl.d/99-nr_hugepages.conf` existe; `use_large_pages=ONLY` em memória; HugePages comprometidas ≥ as páginas dos segmentos da instância | `nr_hugepages` gravado com o banco ainda em `TRUE` (a fase continua de onde parou); banco parado com `ONLY` no spfile (`ORA-27106`, ver falhas-conhecidas) |
 
-A fase 00 não deixa sinal (é só leitura). Depois da 40 ela **aborta de propósito**.
+A fase 00 não deixa sinal (é só leitura). Depois da 40 (ou da 50 em `si_fs`) ela **aborta de
+propósito**.
+
+**Cenário `si_fs`** (grupo `oracle_si`): não há 30 nem 40. Na 60, os sinais são o oratab, o pmon, o
+`<ora_db_data_dir>/<DB>` e o `cfgtoollogs/dbca/<DB>` (sem `srvctl` nem `+DG`). Na 65, o serviço
+aparece em `cdb_services`/`v$active_services` e a PDB em `dba_pdb_saved_states` com `OPEN`.
 
 ## Coleta num comando só
 

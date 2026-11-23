@@ -2,28 +2,37 @@
 # Catálogo da mídia (_stage_items), obrigatoriamente completo. Incluído por verify e collect.
 # Sem sha256 não há como provar a integridade nem decidir o que mover.
 
+# O que cada cenário instala (rnrdm 19.32 OL9): Grid + banco em restart_asm (GIRU nos dois homes,
+# ASMLib); só o banco em si_fs (DB RU, sem Grid nem ASMLib).
+- name: Stage | Chaves da mídia deste cenário
+  ansible.builtin.set_fact:
+    _stage_keys: >-
+      {{ {'restart_asm': ['grid_base', 'db_base', 'opatch', 'ru_grid', 'ru_db', 'asmlib'],
+          'si_fs':       ['db_base', 'opatch', 'ru_db']}[ora_install_type]
+         | select('in', ora_media | list + ['grid_base', 'db_base', 'opatch', 'ru_grid', 'ru_db'])
+         | list }}
+
 - name: Stage | Chaves obrigatórias do catálogo
   ansible.builtin.assert:
     that: item in ora_media
-    fail_msg: "ora_media sem a chave obrigatória '{{ item }}'."
+    fail_msg: "ora_media sem a chave obrigatória '{{ item }}' (cenário {{ ora_install_type }})."
     quiet: true
-  loop: [grid_base, db_base, opatch, ru_grid, ru_db]
+  loop: "{{ _stage_keys }}"
 
 - name: Stage | Montar lista de mídia esperada
   ansible.builtin.set_fact:
     _stage_items: >-
-      {{ [ora_media.grid_base, ora_media.db_base, ora_media.opatch,
-          ora_media.ru_grid, ora_media.ru_db] + (ora_media.oneoffs | default([]))
-       + ([ora_media.asmlib] if ora_media.asmlib is defined else [])
-       + ([ora_media.cvu] if ora_media.cvu is defined else []) }}
+      {{ (_stage_keys | map('extract', ora_media) | list) + (ora_media.oneoffs | default([]))
+       + ([ora_media.cvu] if ora_media.cvu is defined and ora_install_type == 'restart_asm' else []) }}
 
 - name: Stage | Catálogo completo (arquivo e sha256 preenchidos)
   ansible.builtin.assert:
     that:
       - _stage_items | rejectattr('file', 'truthy') | list | length == 0
       - _stage_items | rejectattr('sha256', 'truthy') | list | length == 0
-      - ora_media.ru_grid.patchid | default('') | length > 0
+      - _stage_items | selectattr('patchid', 'defined') | rejectattr('patchid', 'truthy') | list | length == 0
       - ora_media.ru_db.patchid | default('') | length > 0
+      - ora_install_type != 'restart_asm' or ora_media.ru_grid.patchid | default('') | length > 0
     fail_msg: >-
       ora_media incompleto: todo item precisa de file e sha256 (copiado do MOS),
       e os RUs precisam de patchid. Sem checksum não há como provar a integridade da mídia.

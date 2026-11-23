@@ -19,8 +19,14 @@
 - name: Fase 50 — software do Oracle Database
   ansible.builtin.import_playbook: 50_db_software.yml
 
+- name: Fase 55 — listener do DB home (só si_fs)
+  ansible.builtin.import_playbook: 55_listener.yml
+
 - name: Fase 60 — criação do banco
   ansible.builtin.import_playbook: 60_dbca.yml
+
+- name: Fase 62 — início automático no boot (só si_fs)
+  ansible.builtin.import_playbook: 62_autostart.yml
 
 - name: Fase 65 — serviços das PDBs
   ansible.builtin.import_playbook: 65_db_service.yml

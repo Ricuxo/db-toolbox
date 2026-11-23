@@ -26,6 +26,23 @@
   changed_when: false
   check_mode: false
   failed_when: _hp_dbstatus.rc != 0 or 'is running' not in _hp_dbstatus.stdout
+  when: ora_install_type == 'restart_asm'
+
+- name: HugePages | Banco aberto (fase 60, si_fs sem Restart)
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      set heading off feedback off pagesize 0
+      select 'INST='||status from v$instance;
+      exit
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _hp_dbstatus_fs
+  changed_when: false
+  check_mode: false
+  failed_when: "'INST=OPEN' not in _hp_dbstatus_fs.stdout"
+  when: ora_install_type == 'si_fs'
 
 - name: HugePages | Estado inicial
   ansible.builtin.include_tasks: state.yml
@@ -133,7 +150,9 @@
     fail_msg: "use_large_pages={{ _hp.ulp_mem }}, {{ _hp.committed }}/{{ _hp.shm_pages }} páginas do SGA em HugePages."
     quiet: true
 
-# Serviços AUTOMATIC sobem com o banco e reabrem as PDBs (fase 65; Multitenant Guide 19c).
+# restart_asm: serviços AUTOMATIC sobem com o banco e reabrem as PDBs (fase 65; Multitenant Guide 19c).
+# si_fs: a PDB reabre pelo SAVE STATE (fase 65); se o serviço de usuário volta junto não está
+# documentado: esta conferência é a prova (comportamento observado).
 - name: HugePages | Serviços e PDBs depois do reinício
   ansible.builtin.command:
     argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]

@@ -2,7 +2,7 @@
 # Fase 10 — preparação do host (preinstall + o que ele não cobre).
 # Depois desta fase: rodar a validação de confirmação dos pré-requisitos de SO.
 - name: Preparação do host
-  hosts: "{{ ora_hosts | default('oracle_restart') }}"
+  hosts: "{{ ora_hosts | default('oracle') }}"
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:

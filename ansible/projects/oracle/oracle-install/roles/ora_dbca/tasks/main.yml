@@ -1,5 +1,6 @@
 ---
-# Fase 60 — criação do banco (CDB + PDB) com dbca silencioso, em ASM, num servidor com Oracle Restart.
+# Fase 60 — criação do banco (CDB + PDB) com dbca silencioso: em ASM com Oracle Restart (restart_asm)
+# ou em filesystem sem Grid (si_fs: -storageType FS, datafileDestination, recoveryAreaDestination).
 # Fontes: 19c Administrator's Guide cap. 2 §2.14 "Database Configuration Assistant Command Reference
 # for Silent Mode" (createDatabase: -responseFile, -enableArchive, -recoveryAreaSize,
 # -redoLogFileSize) e cap. 4 §4.1.5 ("DBCA automatically adds the database to the Oracle Restart
@@ -16,6 +17,9 @@
       ORACLE_HOME: "{{ ora_grid_home }}"
       ORACLE_BASE: "{{ ora_base }}"
       ORACLE_SID: "+ASM"
+    # Onde os datafiles e a FRA têm de estar (pós-checagem).
+    _dbca_data_prefix: "{{ ('+' ~ ora_db_diskgroup ~ '/') if ora_install_type == 'restart_asm' else (ora_db_data_dir ~ '/') }}"
+    _dbca_fra_dest: "{{ ('+' ~ ora_db_fra_diskgroup) if ora_install_type == 'restart_asm' else ora_db_fra_dir }}"
 
 # ---------- Pré-condições (somente leitura) ----------
 # O rsp com senha fica em /tmp e é apagado no always a partir do controller; se o controller morre,
@@ -65,6 +69,7 @@
   changed_when: false
   failed_when: false
   check_mode: false
+  when: ora_install_type == 'restart_asm'
 
 # Pela linha de comando: o Oracle grava o comm em minúsculas (ora_pmon_orcl), e pgrep -x usa o comm.
 - name: dbca | Instância no ar
@@ -84,6 +89,17 @@
   changed_when: false
   failed_when: false
   check_mode: false
+  when: ora_install_type == 'restart_asm'
+
+# si_fs: o dbca grava os arquivos em <datafileDestination>/<DB_UNIQUE_NAME>.
+- name: dbca | Arquivos do banco no filesystem
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ ora_db_data_dir | default('') }}/{{ ora_db_name | upper }}"
+    - "{{ ora_db_data_dir | default('') }}/{{ ora_db_name | lower }}"
+  register: _dbca_fsdir
+  when: ora_install_type == 'si_fs'
 
 - name: dbca | Logs de tentativa anterior do dbca
   ansible.builtin.stat:
@@ -94,9 +110,11 @@
   vars:
     _found: >-
       {{ (['/etc/oratab'] if _dbca_oratab.rc == 0 else [])
-         + (['Oracle Restart (srvctl config database)'] if _dbca_srvctl.rc == 0 else [])
+         + (['Oracle Restart (srvctl config database)'] if _dbca_srvctl.rc | default(1) == 0 else [])
          + (['processo ora_pmon_' ~ ora_db_name] if _dbca_pmon.rc == 0 else [])
-         + (['+' ~ ora_db_diskgroup ~ '/' ~ (ora_db_name | upper)] if _dbca_asmdir.rc == 0 else [])
+         + (['+' ~ ora_db_diskgroup ~ '/' ~ (ora_db_name | upper)] if _dbca_asmdir.rc | default(1) == 0 else [])
+         + (_dbca_fsdir.results | default([]) | selectattr('stat.exists', 'defined')
+            | selectattr('stat.exists') | map(attribute='item') | list)
          + ([_dbca_logdir.stat.path] if _dbca_logdir.stat.exists else []) }}
   ansible.builtin.assert:
     that:
@@ -127,6 +145,20 @@
   changed_when: false
   check_mode: false
   failed_when: _dbca_dg.rc != 0 or 'STATE=ONLINE' not in _dbca_dg.stdout
+  when: ora_install_type == 'restart_asm'
+
+- name: dbca | Diretórios dos datafiles e da FRA (fase 10)
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ [ora_db_data_dir, ora_db_fra_dir] if ora_install_type == 'si_fs' else [] }}"
+  register: _dbca_fs_dirs
+
+- name: dbca | Faltam os diretórios do filesystem
+  ansible.builtin.assert:
+    that: _dbca_fs_dirs.results | map(attribute='stat.isdir', default=false) | reject | list | length == 0
+    fail_msg: "{{ ora_db_data_dir }} ou {{ ora_db_fra_dir }} não existe: rode a fase 10."
+    quiet: true
+  when: ora_install_type == 'si_fs'
 
 - name: dbca | Senhas do Vault presentes
   ansible.builtin.assert:
@@ -211,6 +243,22 @@
   register: _dbca_status
   changed_when: false
   failed_when: _dbca_status.rc != 0 or 'is running' not in _dbca_status.stdout
+  when: ora_install_type == 'restart_asm'
+
+- name: dbca | Instância aberta (si_fs, sem Restart)
+  ansible.builtin.command:
+    argv: ["{{ ora_db_home }}/bin/sqlplus", -S, "/ as sysdba"]
+    stdin: |
+      set heading off feedback off pagesize 0
+      select 'Instance '||instance_name||' is '||status from v$instance;
+      exit
+  environment: "{{ _dbca_env_db }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dbca_status_fs
+  changed_when: false
+  failed_when: "' is OPEN' not in _dbca_status_fs.stdout"
+  when: ora_install_type == 'si_fs'
 
 - name: dbca | Configuração efetiva do banco
   ansible.builtin.command:
@@ -226,6 +274,7 @@
       select 'FRA_DEST='||value from v$parameter where name='db_recovery_file_dest';
       select 'FRA_SIZE='||value from v$parameter where name='db_recovery_file_dest_size';
       select 'REDO_MB='||min(bytes)/1048576||'/'||max(bytes)/1048576 from v$log;
+      select 'DATAFILES_FORA='||count(*) from v$datafile where name not like '{{ _dbca_data_prefix }}%';
       select 'SQLPATCH='||patch_id||' '||action||' '||status||' '||description from dba_registry_sqlpatch order by action_time;
       exit
   environment: "{{ _dbca_env_db }}"
@@ -246,7 +295,8 @@
       - _v.PDB == 'READ WRITE'
       - _v.MEMORY_TARGET == '0'
       - _v.SGA_TARGET | int > 0
-      - _v.FRA_DEST == '+' ~ ora_db_fra_diskgroup
+      - _v.FRA_DEST == _dbca_fra_dest
+      - _v.DATAFILES_FORA == '0'
       - _v.FRA_SIZE | int == ora_db_fra_size_mb * 1048576
       - _v.REDO_MB == (ora_db_redo_size_mb ~ '/' ~ ora_db_redo_size_mb)
     fail_msg: "Banco criado, mas diferente do pedido: {{ _v }}"
@@ -255,4 +305,4 @@
 # datapatch: a doc 19c lida não diz se o dbca o roda num home com RU. Fica registrado para o DBA.
 - name: dbca | Resumo (inclui dba_registry_sqlpatch)
   ansible.builtin.debug:
-    msg: "{{ _dbca_status.stdout_lines + _dbca_sql.stdout_lines }}"
+    msg: "{{ (_dbca_status.stdout_lines | default(_dbca_status_fs.stdout_lines)) + _dbca_sql.stdout_lines }}"

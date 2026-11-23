@@ -1,7 +1,17 @@
 # oracle-install
 
 Instalação de Oracle com Ansible, com roles próprias (sem dependência da oravirt).
-Escopo atual: **19c · Oracle Restart · ASM (ASMLib v3) · Oracle Linux 9 · dono único `oracle`**.
+Escopo atual: **19c · Oracle Linux 9 · dono único `oracle`**, em dois cenários:
+
+| Cenário | Grupo do inventário | O que instala | Fases |
+|---|---|---|---|
+| `restart_asm` | `oracle_restart` | Oracle Restart (Grid standalone) + ASM (ASMLib v3); banco em ASM; GIRU nos dois homes | 00 10 20 30 40 50 60 65 70 |
+| `si_fs` | `oracle_si` | Só o banco (Single Instance, sem Grid) em filesystem; DB RU; listener do home; início no boot por `dbstart`/`dbora` | 00 10 20 50 55 60 62 65 70 |
+
+**O cenário vem do grupo do host no inventário** (`group_vars/<grupo>/main.yml` define
+`ora_install_type`), do mesmo jeito que o ambiente vem do `-i`. As fases comuns miram no grupo
+`oracle`; a 30 e a 40 só em `oracle_restart`; a 55 e a 62 só em `oracle_si`. Cada uma recusa o
+cenário errado, mesmo forçada com `-e ora_hosts=`. RAC: fora do escopo por enquanto.
 
 ## Princípios
 
@@ -38,10 +48,12 @@ Escopo atual: **19c · Oracle Restart · ASM (ASMLib v3) · Oracle Linux 9 · do
 | 6 | `playbooks/20_stage.yml` — recolhe a mídia (se configurado), verifica (presença e sha256) e descompacta RU e one-offs |
 | 7 | `playbooks/30_asmlib.yml` — ASMLib v3 (`ol9_addons` + `oracleasmlib` do stage, `rpm -K`), partição GPT e `createdisk` (só disco vazio por `by-id`) |
 | 8 | `playbooks/40_grid.yml` — Grid/Restart: Grid home, OPatch, `cvuqdisk` da mídia, `gridSetup.sh -silent -applyRU -applyOneOffs` (gate: pré-requisitos integrados, já com a RU; rc 6 só passa com avisos listados em `ora_grid_accept_warnings`), `root.sh`, `-executeConfigTools` |
-| 9 | `playbooks/50_db_software.yml` — software do banco (só software) no `dbhome_1`: OPatch, `runInstaller -silent -applyRU <GIRU> -applyOneOffs` (banco em ASM com Restart usa a GIRU, página 19.32 das Release Notes; rc 6 só com avisos em `ora_db_accept_warnings`), `root.sh`; confere DB RU e one-offs no `opatch lspatches` |
-| 10 | `playbooks/60_dbca.yml` — `dbca -silent -createDatabase` (rsp do template oficial, senhas do vault, 0600, apagado no fim; archivelog, FRA e redo pela linha de comando): CDB + PDB em ASM, AL32UTF8, ASMM; confere registro no Restart, archivelog, PDB aberta, memória, FRA e redo; mostra o `dba_registry_sqlpatch` |
-| 11 | `playbooks/65_db_service.yml` — serviço do Restart por PDB (`srvctl add service -pdb -policy AUTOMATIC`, só se não existir; nunca altera um existente) e garante o serviço rodando, o que abre a PDB em READ WRITE; idempotente |
-| 12 | `playbooks/70_hugepages.yml` — depois do banco criado (doc 19c): `vm.nr_hugepages` = soma dos segmentos de memória compartilhada da instância (`sysresv` + `ipcs`, por segmento, arredondando para cima) + `ora_hugepages_extra` (2) em `/etc/sysctl.d/99-nr_hugepages.conf` (≤ 70% da RAM; confere memlock ≥ 90% e `vm.hugetlb_shm_group`); **reinicia o banco via srvctl** até o SGA estar em HugePages (com `TRUE`, prova pela tabela EXPECTED/ALLOCATED_PAGES da última partida no alert log, porque o segmento pequeno fica em 4K de propósito) e depois para valer `USE_LARGE_PAGES=ONLY`; confere serviços e PDBs abertos depois do reinício |
+| 9 | `playbooks/50_db_software.yml` — software do banco (só software) no `dbhome_1`: OPatch, `runInstaller -silent -applyRU <GIRU> -applyOneOffs` (banco em ASM com Restart usa a GIRU, página 19.32 das Release Notes; rc 6 só com avisos em `ora_db_accept_warnings`), `root.sh`; confere DB RU e one-offs no `opatch lspatches` | **Em `si_fs`**: `-applyRU <DBRU>` (página 19.32, "Single-instance Oracle Database"), sem exigir o Restart.
+| 9a | `playbooks/55_listener.yml` — **só `si_fs`**: listener do DB home com `netca -silent -responsefile` e o template `assistants/netca/netca.rsp` do próprio home (LISTENER, TCP 1521; ladbi "Running Configuration Assistants Using Response Files"); recusa a 1521 ocupada por outro processo |
+| 10 | `playbooks/60_dbca.yml` — `dbca -silent -createDatabase` (rsp do template oficial, senhas do vault, 0600, apagado no fim; archivelog, FRA e redo pela linha de comando): CDB + PDB em ASM, AL32UTF8, ASMM; confere registro no Restart, archivelog, PDB aberta, memória, FRA e redo; mostra o `dba_registry_sqlpatch` | **Em `si_fs`**: `storageType=FS`, `datafileDestination=ora_db_data_dir`, `recoveryAreaDestination=ora_db_fra_dir`; confere que todos os datafiles ficaram no diretório pedido.
+| 10a | `playbooks/62_autostart.yml` — **só `si_fs`**: `Y` no `/etc/oratab` e `/etc/init.d/dbora` com o texto da doc (unxar 19c §2.2.1; `dbstart $ORACLE_HOME` também sobe o listener), `chgrp dba`, `0750` e links `rc0.d/K01dbora`, `rc3.d/S99dbora` e `rc5.d/S99dbora`. Não reinicia nada |
+| 11 | `playbooks/65_db_service.yml` — serviço do Restart por PDB (`srvctl add service -pdb -policy AUTOMATIC`, só se não existir; nunca altera um existente) e garante o serviço rodando, o que abre a PDB em READ WRITE; idempotente | **Em `si_fs`** (sem Restart): `DBMS_SERVICE.CREATE_SERVICE`/`START_SERVICE` na PDB e `ALTER PLUGGABLE DATABASE ... SAVE STATE` (Multitenant Guide 19c). Se o serviço de usuário volta sozinho depois do reinício não está documentado: a fase 70 e o reboot do lab conferem.
+| 12 | `playbooks/70_hugepages.yml` — depois do banco criado (doc 19c): `vm.nr_hugepages` = soma dos segmentos de memória compartilhada da instância (`sysresv` + `ipcs`, por segmento, arredondando para cima) + `ora_hugepages_extra` (2) em `/etc/sysctl.d/99-nr_hugepages.conf` (≤ 70% da RAM; confere memlock ≥ 90% e `vm.hugetlb_shm_group`); **reinicia o banco via srvctl** até o SGA estar em HugePages (com `TRUE`, prova pela tabela EXPECTED/ALLOCATED_PAGES da última partida no alert log, porque o segmento pequeno fica em 4K de propósito) e depois para valer `USE_LARGE_PAGES=ONLY`; confere serviços e PDBs abertos depois do reinício | **Em `si_fs`**: reinício por `shutdown immediate`/`startup` no SQL*Plus.
 
 ## Como rodar
 
@@ -89,6 +101,9 @@ time ansible-playbook -i ../../../inventories/lab playbooks/site.yml --ask-vault
   depois de corrigir, rode uma a uma a partir da que falhou. Na fase 70, "O kernel alocou X de Y
   HugePages" pede reboot do servidor e a fase de novo (não repetir sem o reboot).
 - **Produção:** o `site.yml` inclui a fase 70 (reinicia o banco) e exige `-e ora_confirm_env=prod`.
+- **Cenário `si_fs`:** o mesmo `site.yml` serve; as fases 30 e 40 não casam host e as 55 e 62 entram.
+  A mídia é só a do banco: `db_base`, OPatch, DB RU e os one-offs. O disco dos datafiles tem de estar
+  montado em `/u02` antes da fase 10. Um reboot depois da instalação prova o `dbora`.
 
 ## Variáveis
 
@@ -111,6 +126,8 @@ servidores Oracle em `group_vars/oracle/main.yml`; o que é de um servidor só e
 | `ora_version` | inventário (`group_vars/oracle`) | release base da mídia, 4 partes (`19.3.0.0`) |
 | `ora_ru` | projeto (`media.yml`) | RU alvo, aplicado na instalação (`19.32.0.0`) |
 | `ora_media` | projeto (`media.yml`) | catálogo da mídia: `file` + `sha256` (+ `patchid` nos RUs) |
+| `ora_install_type` | inventário (`group_vars/oracle_restart` ou `oracle_si`) | cenário: `restart_asm` ou `si_fs` |
+| `ora_db_data_mount`, `ora_db_data_dir`, `ora_db_fra_dir` | inventário (`group_vars/oracle_si`) | `si_fs`: `/u02` (tem de ser ponto de montagem), `/u02/app/oracle/oradata`, `<ORACLE_BASE>/fast_recovery_area` (OFA) |
 | `ora_asm` | host_vars | discos (`label` + `device` por `/dev/disk/by-id/`) e diskgroups; o 1º diskgroup é criado no gridSetup |
 | `ora_media.asmlib` | projeto (`media.yml`) | RPM `oracleasmlib` (file + sha256), baixado pelo DBA |
 | `ora_media.cvu` | projeto (`media.yml`) | CVU avulso do MOS (patch 30839369): **não** usado na 19c em OL9 (sem dados de referência); mapeado para 26ai |

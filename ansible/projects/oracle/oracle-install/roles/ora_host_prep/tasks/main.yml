@@ -111,6 +111,43 @@
     - _hp_owner_exists | bool
     - not _hp_orainv.stat.exists
 
+# ---------- Só em si_fs: diretórios dos datafiles e da FRA ----------
+# OFA (19c ladbi, "Optimal Flexible Architecture File Path Examples"): /u02/app/oracle/oradata e
+# <ORACLE_BASE>/fast_recovery_area. O disco dos dados é infra: aqui só se confere que ele está
+# montado, para os datafiles nunca caírem no filesystem raiz.
+- name: Host | Ponto de montagem dos datafiles (si_fs)
+  ansible.builtin.command: findmnt -n -o SOURCE,FSTYPE --mountpoint {{ ora_db_data_mount }}
+  register: _hp_data_mount
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: ora_install_type == 'si_fs'
+
+- name: Host | Datafiles num disco montado (si_fs)
+  ansible.builtin.assert:
+    that: _hp_data_mount.rc == 0
+    fail_msg: >-
+      {{ ora_db_data_mount }} não é um ponto de montagem. Os datafiles iriam para o filesystem raiz:
+      peça à infra o disco dos dados montado em {{ ora_db_data_mount }} (fstab por UUID).
+    quiet: true
+  when: ora_install_type == 'si_fs'
+
+- name: Host | Diretórios dos datafiles e da FRA (si_fs)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ora_owner }}"
+    group: "{{ ora_install_group }}"
+    mode: "0775"
+  loop:
+    - "{{ ora_db_data_mount }}/app"
+    - "{{ ora_db_data_mount }}/app/oracle"
+    - "{{ ora_db_data_dir }}"
+    - "{{ ora_db_fra_dir }}"
+  when:
+    - ora_install_type == 'si_fs'
+    - _hp_owner_exists | bool
+
 - name: Host | Parâmetros de kernel exigidos pelo gridSetup 19.32 (além do preinstall)
   ansible.posix.sysctl:
     name: "{{ item.key }}"

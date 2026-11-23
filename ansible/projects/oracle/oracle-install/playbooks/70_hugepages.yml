@@ -2,7 +2,7 @@
 # Fase 70 — HugePages para o SGA e USE_LARGE_PAGES. Precisa das fases 60 e 65.
 # ATENÇÃO: reinicia o banco (srvctl) quando há mudança. Em servidor em uso, só em janela.
 - name: Oracle Database — HugePages
-  hosts: "{{ ora_hosts | default('oracle_restart') }}"
+  hosts: "{{ ora_hosts | default('oracle') }}"
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:

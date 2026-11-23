@@ -12,7 +12,7 @@ argument_specs:
       ora_base: {type: path, required: true}
       ora_grid_home: {type: path, required: true}
       ora_db_home: {type: path, required: true}
-      ora_asm: {type: dict, required: true}
+      ora_asm: {type: dict}               # obrigatório só em restart_asm (o cenário vem do inventário)
       ora_db_name: {type: str, required: true}
       ora_pdb_name: {type: str, required: true}
       ora_db_total_memory_mb: {type: int, required: true}

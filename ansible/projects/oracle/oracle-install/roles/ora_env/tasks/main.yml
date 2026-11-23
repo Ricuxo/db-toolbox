@@ -21,9 +21,32 @@
       -i: não passe ora_env por -e, e confira o ora_env em group_vars/all/main.yml.
     quiet: true
 
+- name: Ambiente | Cenário do host (grupo do inventário)
+  ansible.builtin.assert:
+    that:
+      - ora_install_type is defined
+      - ora_install_type in ora_install_types
+    fail_msg: >-
+      ora_install_type {{ ('= "' ~ ora_install_type ~ '" não está em ' ~ ora_install_types)
+      if ora_install_type is defined else 'não definido' }}. Ele vem do grupo do host no inventário
+      (oracle_restart ou oracle_si, em group_vars/<grupo>/main.yml).
+    quiet: true
+
+- name: Ambiente | Variáveis do cenário si_fs (group_vars/oracle_si)
+  ansible.builtin.assert:
+    that:
+      - ora_db_data_mount is defined
+      - ora_db_data_dir is defined
+      - ora_db_fra_dir is defined
+    fail_msg: >-
+      Cenário si_fs sem ora_db_data_mount, ora_db_data_dir ou ora_db_fra_dir. Eles vêm de
+      group_vars/oracle_si/main.yml: o host está no grupo oracle_si do inventário?
+    quiet: true
+  when: ora_install_type == 'si_fs'
+
 - name: Ambiente | Alvo desta execução
   ansible.builtin.debug:
-    msg: "Ambiente {{ ora_env | upper }} — {{ inventory_hostname }} ({{ ansible_host | default(inventory_hostname) }})"
+    msg: "Ambiente {{ ora_env | upper }} — {{ inventory_hostname }} ({{ ansible_host | default(inventory_hostname) }}) — cenário {{ ora_install_type }}"
 
 - name: Ambiente | Confirmação para alterar banco existente em produção
   ansible.builtin.assert:

@@ -1,0 +1,3 @@
+---
+# Grupo do dbora: "Change the group of the dbora file to the OSDBA group (typically dba)" (doc 19c).
+ora_autostart_osdba_group: dba

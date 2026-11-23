@@ -1,15 +1,18 @@
 ---
-# Fase 50 — software Oracle Database 19c (INSTALL_DB_SWONLY) num servidor com Oracle Restart.
-# Fontes: 19c rnrdm "Installing Oracle Database 19c (19.32) on Oracle Linux 9 and RHEL 9" (banco em
-# ASM com Restart: runInstaller -applyRU <GIRU> -applyOneOffs ...); 19c ladbi "Installing the Oracle
+# Fase 50 — software Oracle Database 19c (INSTALL_DB_SWONLY).
+# Fontes: 19c rnrdm "Installing Oracle Database 19c (19.32) on Oracle Linux 9 and RHEL 9": banco em
+# ASM com Restart (restart_asm) usa runInstaller -applyRU <GIRU>; "Single-instance Oracle Database
+# (19.32)" (si_fs, sem Grid) usa -applyRU <DBRU>; os dois com -applyOneOffs ...; 19c ladbi "Installing the Oracle
 # Database Software" ("Run the runInstaller command from the Oracle home directory only"), "Running
 # Oracle Universal Installer Using a Response File" (-silent, caminho absoluto, root.sh como root) e
 # "Preparing Response Files" (dono do instalador, 600).
 # Sem bypass: nunca -ignorePrereq(Failure). O gate é a checagem do próprio runInstaller.
 
-- name: DB software | Caminhos da RU (GIRU) e dos one-offs no stage
+- name: DB software | Caminhos da RU (GIRU em restart_asm, DB RU em si_fs) e dos one-offs no stage
+  vars:
+    _ru: "{{ ora_media.ru_grid if ora_install_type == 'restart_asm' else ora_media.ru_db }}"
   ansible.builtin.set_fact:
-    _dbsw_ru_dir: "{{ ora_stage_patch_dir }}/{{ ora_media.ru_grid.patchid }}/{{ ora_media.ru_grid.patchid }}"
+    _dbsw_ru_dir: "{{ ora_stage_patch_dir }}/{{ _ru.patchid }}/{{ _ru.patchid }}"
     _dbsw_oneoff_dirs: >-
       {{ (ora_media.oneoffs | default([])) | map(attribute='patchid')
          | map('regex_replace', '^(.*)$', ora_stage_patch_dir ~ '/\1/\1') | list }}
@@ -45,10 +48,14 @@
     path: /etc/oracle/olr.loc
   register: _dbsw_olr
 
-- name: DB software | Falta o Oracle Restart
+- name: DB software | Restart presente só no cenário que o usa
   ansible.builtin.assert:
-    that: _dbsw_olr.stat.exists
-    fail_msg: "/etc/oracle/olr.loc não existe: instale o Grid (fase 40) antes do software do banco."
+    that: _dbsw_olr.stat.exists == (ora_install_type == 'restart_asm')
+    fail_msg: >-
+      {{ '/etc/oracle/olr.loc não existe: instale o Grid (fase 40) antes do software do banco.'
+         if ora_install_type == 'restart_asm' else
+         'Há Grid/Restart neste servidor (/etc/oracle/olr.loc), mas o cenário é si_fs (sem Grid). '
+         ~ 'Confira o grupo do host no inventário.' }}
     quiet: true
 
 - name: DB software | Instalador ou OPatch em execução
@@ -58,7 +65,13 @@
   failed_when: false
   check_mode: false
 
-# O inventory.xml já existe (fase 40); sinal é o DB home registrado nele.
+# Sinal é o DB home registrado no inventory.xml. Em restart_asm ele já existe (fase 40); em si_fs
+# só existe se outro produto Oracle já foi instalado (sem ele, nenhum home está registrado).
+- name: DB software | inventory.xml existe?
+  ansible.builtin.stat:
+    path: "{{ ora_inventory_dir }}/ContentsXML/inventory.xml"
+  register: _dbsw_inv_xml
+
 - name: DB software | DB home registrado no inventário
   ansible.builtin.command:
     argv: [grep, -F, 'LOC="{{ ora_db_home }}"', "{{ ora_inventory_dir }}/ContentsXML/inventory.xml"]
@@ -66,6 +79,7 @@
   changed_when: false
   failed_when: _dbsw_in_inventory.rc > 1
   check_mode: false
+  when: _dbsw_inv_xml.stat.exists
 
 # O .patch_storage sozinho NÃO é sinal: a mídia 19.3 já vem com ele (patches de 2019). Parcial é
 # um sub-patch da RU ou um one-off desta instalação já aplicado no home.
@@ -96,7 +110,7 @@
 - name: DB software | Abortar se o DB home não estiver limpo
   vars:
     _found: >-
-      {{ (['inventory.xml registra ' ~ ora_db_home] if _dbsw_in_inventory.rc == 0 else [])
+      {{ (['inventory.xml registra ' ~ ora_db_home] if _dbsw_in_inventory.rc | default(1) == 0 else [])
          + (_dbsw_applied.files | default([]) | map(attribute='path') | list) }}
   ansible.builtin.assert:
     that:
@@ -221,6 +235,16 @@
           and (_dbsw_setup.stdout | regex_findall('\\[WARNING\\] \\[(INS-[0-9]+)\\]')
                | difference(ora_db_accept_warnings) | length == 0))
 
+    # ladbi 19c "Running Oracle Universal Installer Using a Response File": "If this is the first
+    # time you are installing Oracle software on your system, then Oracle Universal Installer prompts
+    # you to run the orainstRoot.sh script." Em si_fs o banco é o primeiro produto; em restart_asm a
+    # fase 40 já rodou (o /etc/oraInst.loc existe e a task não faz nada).
+    - name: DB software | orainstRoot.sh (primeiro inventário do servidor)
+      ansible.builtin.command: "{{ ora_inventory_dir }}/orainstRoot.sh"
+      args:
+        creates: /etc/oraInst.loc
+        removes: "{{ ora_inventory_dir }}/orainstRoot.sh"
+
     # Só roda logo depois do runInstaller desta execução: numa 2ª execução a fase aborta antes.
     - name: DB software | root.sh
       ansible.builtin.command: "{{ ora_db_home }}/root.sh"
@@ -236,8 +260,8 @@
       when: _dbsw_tmp.path is defined
 
 # ---------- Pós-checagem ----------
-# No DB home a GIRU aplica o sub-patch do banco (ru_db) entre outros; confere-se o que o catálogo
-# identifica sem suposição: a DB RU e cada one-off.
+# No DB home, a GIRU (restart_asm) aplica o sub-patch do banco (ru_db) entre outros, e a DB RU (si_fs)
+# é o próprio ru_db; confere-se o que o catálogo identifica sem suposição: a DB RU e cada one-off.
 - name: DB software | Patches no DB home
   ansible.builtin.command: "{{ ora_db_home }}/OPatch/opatch lspatches"
   become: true

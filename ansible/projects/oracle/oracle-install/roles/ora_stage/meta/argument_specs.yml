@@ -9,7 +9,7 @@ argument_specs:
         required: true
         description:
           - Catálogo da mídia. Cada item tem file e sha256 (do MOS); ru_grid e ru_db têm patchid.
-          - Chaves obrigatórias grid_base, db_base, opatch, ru_grid, ru_db; oneoffs é lista opcional.
+          - Chaves obrigatórias por cenário - restart_asm grid_base, db_base, opatch, ru_grid, ru_db; si_fs db_base, opatch, ru_db. oneoffs é lista opcional.
   collect:
     short_description: Move para o stage a mídia do catálogo deixada em outro diretório do servidor.
     options:
