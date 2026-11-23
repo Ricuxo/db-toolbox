@@ -148,10 +148,10 @@ cd /projetos/DESENVOLVIMENTO/desenvolvimento/db-toolbox/ansible/projects/oracle/
 
 | Momento | O que rodar | Avisos |
 |---|---|---|
-| Antes de tudo | skill `oracle-prereq-so`, **triagem** | Devolve à infra o que o playbook não resolve (RAM, swap, `/u01`, discos) |
+| Antes de tudo | skill `oracle-install-os`, **triagem** | Devolve à infra o que o playbook não resolve (RAM, swap, `/u01`, discos) |
 | 00 | `00_gate.yml --check` | Só leitura |
 | 10 | `10_host_prep.yml --check --diff`, depois a execução real | O GRUB (THP `madvise`) só vale no próximo boot: reiniciar em janela |
-| Depois da 10 | `oracle-prereq-so`, **confirmação** | Obrigatória antes do software |
+| Depois da 10 | `oracle-install-os`, **confirmação** | Obrigatória antes do software |
 | 20 | DBA copia a mídia para o stage, depois `20_stage.yml` | sha256 do MOS no `ora_media` |
 | 30 | `30_asmlib.yml` | Só disco vazio por by-id |
 | 40 | `40_grid.yml --ask-vault-pass` | Pede o vault **até em `--check`** (o arg spec renderiza as senhas); cerca de 15 a 30 min |

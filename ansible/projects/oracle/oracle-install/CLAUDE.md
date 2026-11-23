@@ -39,6 +39,8 @@ pergunte.
    (`failed=1`, `changed=0`).
 4. Casos negativos: a fase tem de recusar entrada errada **sem alterar nada**. Confira no
    servidor depois.
-5. Depois de mudar a preparação do host, rode a confirmação da skill `oracle-prereq-so`.
+5. Depois de mudar a preparação do host, rode a confirmação da skill `oracle-install-os`.
+6. Mudou o que uma fase corrige (item novo, item removido, cenário novo)? Atualize o
+   `MAPA-PREREQ.md`: a skill `oracle-install-os` monta o plano de correção a partir dele.
 
 Relate o que foi testado e o que não foi. Não declare pronto o que não rodou.
