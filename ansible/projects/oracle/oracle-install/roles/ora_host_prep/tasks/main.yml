@@ -94,7 +94,7 @@
   when: _hp_owner_exists | bool
 
 # O oraInventory só é criado: depois da instalação, o instalador define as permissões dele e a
-# fase 10 não deve desfazê-las (visto em 2026-11-14: a role trocava 0770 por 0775).
+# fase 10 não deve desfazê-las (o instalador grava 0770, e a role não pode trocar por 0775).
 - name: Host | oraInventory existe?
   ansible.builtin.stat:
     path: "{{ ora_inventory_dir }}"
