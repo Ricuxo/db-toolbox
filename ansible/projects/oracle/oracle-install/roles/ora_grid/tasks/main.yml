@@ -89,6 +89,7 @@
     patterns: '^[0-9]+$'
     use_regex: true
   register: _grid_ru_sub
+  when: _grid_install_node | bool          # no RAC o stage só existe no nó de instalação
 
 - name: Grid | .patch_storage no home
   ansible.builtin.stat:
@@ -100,7 +101,7 @@
     paths: "{{ ora_grid_home }}/.patch_storage"
     file_type: directory
     patterns: >-
-      {{ (_grid_ru_sub.files | map(attribute='path') | map('basename') | list
+      {{ (_grid_ru_sub.files | default([]) | map(attribute='path') | map('basename') | list
           + (ora_media.oneoffs | default([]) | map(attribute='patchid') | list))
          | map('regex_replace', '$', '_*') | list }}
   register: _grid_applied
