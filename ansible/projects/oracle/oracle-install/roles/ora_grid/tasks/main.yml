@@ -7,7 +7,7 @@
 # Linux 9 and RHEL 9" (-applyRU/-applyOneOffs).
 # Sem bypass: nunca -ignorePrereq(Failure). O gate é a checagem do próprio gridSetup com a RU aplicada.
 # No RAC o instalador roda só no nó de instalação (o 1º de ora_rac_nodes) e copia o home para os
-# outros; orainstRoot.sh e root.sh rodam em todos, um nó por vez (throttle: 1), na ordem do inventário.
+# outros; orainstRoot.sh e root.sh rodam em todos, um nó por vez, na ordem de ora_rac_nodes.
 
 - name: Grid | Só nos cenários com Grid (restart_asm, rac_asm)
   ansible.builtin.assert:
@@ -36,12 +36,13 @@
 # O apagar do response file roda a partir do controller (bloco always). Se o controller morre
 # no meio, o arquivo com senha fica em /tmp; a próxima execução o remove ANTES de qualquer
 # checagem que possa abortar.
-- name: Grid | RAC — todos os nós do cluster nesta execução
+- name: Grid | RAC — exatamente os nós de um cluster nesta execução
   ansible.builtin.assert:
-    that: ora_rac_nodes | map(attribute='name') | difference(ansible_play_hosts_all) | length == 0
+    that: ora_rac_nodes | map(attribute='name') | sort == ansible_play_hosts_all | sort
     fail_msg: >-
-      O gridSetup do cluster e os root.sh precisam de todos os nós ({{ ora_rac_nodes | map(attribute='name') | list }})
-      na mesma execução; nesta estão {{ ansible_play_hosts_all }}.
+      O gridSetup do cluster e os root.sh precisam de todos os nós deste cluster
+      ({{ ora_rac_nodes | map(attribute='name') | list }}) e só deles; nesta execução estão
+      {{ ansible_play_hosts_all }}. Use -e ora_hosts=<grupo do cluster>.
     quiet: true
   when: _grid_rac | bool
 
@@ -356,15 +357,12 @@
           and (_grid_setup.stdout | regex_findall('\\[WARNING\\] \\[(INS-[0-9]+)\\]')
                | difference(ora_grid_accept_warnings) | length == 0))
 
-    # RAC: um nó por vez, na ordem do inventário (o nó de instalação primeiro). O root.sh do cluster
-    # tem de terminar no primeiro nó antes de começar nos demais (19c cwlin: run the root.sh script on
-    # the first node, then on the other nodes).
     - name: Grid | orainstRoot.sh (primeiro inventário do servidor)
       ansible.builtin.command: "{{ ora_inventory_dir }}/orainstRoot.sh"
       args:
         creates: /etc/oraInst.loc
         removes: "{{ ora_inventory_dir }}/orainstRoot.sh"
-      throttle: 1
+      when: not _grid_rac | bool
 
     - name: Grid | root.sh
       ansible.builtin.command: "{{ ora_grid_home }}/root.sh"
@@ -372,7 +370,31 @@
         creates: /etc/oracle/olr.loc
       async: 3600
       poll: 30
-      throttle: 1
+      when: not _grid_rac | bool
+
+    # RAC: um nó por vez, na ordem de ora_rac_nodes (o nó de instalação primeiro), e não na ordem dos
+    # hosts do play, que o Ansible não garante. O root.sh do cluster tem de terminar no primeiro nó antes
+    # de começar nos demais (19c cwlin: run the root.sh script on the first node, then on the other nodes).
+    - name: Grid | RAC — orainstRoot.sh, nó a nó
+      ansible.builtin.command: "{{ ora_inventory_dir }}/orainstRoot.sh"
+      args:
+        creates: /etc/oraInst.loc
+        removes: "{{ ora_inventory_dir }}/orainstRoot.sh"
+      delegate_to: "{{ item }}"
+      run_once: true
+      loop: "{{ ora_rac_nodes | map(attribute='name') | list }}"
+      when: _grid_rac | bool
+
+    - name: Grid | RAC — root.sh, nó a nó
+      ansible.builtin.command: "{{ ora_grid_home }}/root.sh"
+      args:
+        creates: /etc/oracle/olr.loc
+      async: 3600
+      poll: 30
+      delegate_to: "{{ item }}"
+      run_once: true
+      loop: "{{ ora_rac_nodes | map(attribute='name') | list }}"
+      when: _grid_rac | bool
 
     - name: Grid | Configuration tools (-executeConfigTools)
       ansible.builtin.command:
