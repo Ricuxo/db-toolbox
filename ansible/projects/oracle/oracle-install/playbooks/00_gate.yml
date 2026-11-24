@@ -11,6 +11,8 @@
       ansible.builtin.import_role:
         name: ora_env
       tags: [always]                # roda mesmo com --tags/--skip-tags
+      vars:
+        ora_env_phase_types: [restart_asm, si_fs, rac_asm]
   tasks:
     - name: Gate do servidor
       ansible.builtin.import_role:

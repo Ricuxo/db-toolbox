@@ -4,8 +4,13 @@
 ora_env_allowed: [lab, dev, hml, prod]
 
 # Cenários de instalação. ora_install_type vem do grupo do inventário
-# (inventories/<amb>/group_vars/<grupo>/main.yml): oracle_restart → restart_asm, oracle_si → si_fs.
-ora_install_types: [restart_asm, si_fs]
+# (inventories/<amb>/group_vars/<grupo>/main.yml): oracle_restart → restart_asm, oracle_si → si_fs,
+# oracle_rac → rac_asm.
+ora_install_types: [restart_asm, si_fs, rac_asm]
+
+# Cenários que a fase atual sabe instalar. Fase que já trata o rac_asm passa a lista dela em vars
+# do import da ora_env; as demais recusam o host RAC antes de qualquer tarefa.
+ora_env_phase_types: [restart_asm, si_fs]
 
 # true nos playbooks que param ou alteram um banco que já existe (ex.: fase 70, que reinicia o
 # banco). Em prod eles exigem -e ora_confirm_env=prod.

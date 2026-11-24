@@ -1,7 +1,7 @@
 ---
 # Preparação do host: RPM preinstall (recomendado pela documentação) + só o que ele não cobre.
 # Não altera SELinux, firewall, swap nem discos. No GRUB só troca o THP para 'madvise'
-# (guia, UEK7+); o 'numa=off' gravado pelo preinstall é documentado e fica.
+# (guia, UEK7+; no RHCK só confere o 'never'); o 'numa=off' gravado pelo preinstall é documentado e fica.
 
 - name: Host | Release suportado por esta role
   ansible.builtin.assert:
@@ -179,8 +179,8 @@
     fail_msg: "Sem IPv4 na rota padrão (ansible_default_ipv4): não há endereço para o /etc/hosts."
     quiet: true
 
-# Linha que cita o IP ou o nome e não é exatamente a esperada = conflito (nome em 127.0.0.1 ou em
-# outro IP, apelidos extras). Não corrige sozinho: o DBA decide.
+# Linha que cita o IP ou o nome e não tem o mesmo IP com os mesmos nomes (em qualquer ordem) =
+# conflito (nome em 127.0.0.1 ou em outro IP, apelidos extras). Não corrige sozinho: o DBA decide.
 - name: Host | Conflitos no /etc/hosts
   ansible.builtin.command:
     argv:
@@ -190,7 +190,9 @@
       - |
         BEGIN { n = split(want, w, " ") }
         /^[[:space:]]*(#|$)/ { next }
-        { l = $1; for (i = 2; i <= NF; i++) l = l " " $i; if (l == want) next
+        { same = ($1 == w[1] && NF == n)
+          for (i = 2; i <= NF && same; i++) { f = 0; for (j = 2; j <= n; j++) if ($i == w[j]) f = 1; same = f }
+          if (same) { print "SAME"; next }
           hit = ($1 == w[1]); for (i = 2; i <= NF; i++) for (j = 2; j <= n; j++) if ($i == w[j]) hit = 1
           if (hit) print }
       - /etc/hosts
@@ -200,10 +202,10 @@
 
 - name: Host | /etc/hosts sem conflito
   ansible.builtin.assert:
-    that: _hp_hosts_conflict.stdout_lines | length == 0
+    that: _hp_hosts_conflict.stdout_lines | reject('equalto', 'SAME') | list | length == 0
     fail_msg: >-
       /etc/hosts tem linha que conflita com '{{ _hp_hosts_line }}':
-      {{ _hp_hosts_conflict.stdout_lines | join(' | ') }}. Corrija à mão e rode de novo.
+      {{ _hp_hosts_conflict.stdout_lines | reject('equalto', 'SAME') | join(' | ') }}. Corrija à mão e rode de novo.
     quiet: true
 
 - name: Host | Nome do servidor no /etc/hosts
@@ -212,6 +214,7 @@
     regexp: "^\\s*{{ ansible_facts['default_ipv4']['address'] | regex_escape }}\\s"
     line: "{{ _hp_hosts_line }}"
     backup: true
+  when: "'SAME' not in _hp_hosts_conflict.stdout_lines"   # a linha já existe, em outra ordem
 
 - name: Host | /dev/shm sem nosuid/noexec (exigência do guia)
   ansible.posix.mount:
@@ -222,18 +225,25 @@
     state: mounted
 
 # THP: o guia manda 'madvise' em UEK7 ou superior. O preinstall 19c el9 grava 'never' para
-# qualquer kernel (arquivo .param do RPM); a role segue a documentação e sobrescreve.
+# qualquer kernel (arquivo .param do RPM); em UEK a role segue a documentação e sobrescreve.
 # Fonte: Setting and Disabling Transparent HugePages on UEK Kernels (19c)
 # https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/configuring-operating-systems-for-oracle-database-on-linux/setting-and-disabling-transparent-hugepages-on-uek-kernels.html
+# Fora do UEK (RHCK) vale a regra geral, "Oracle recommends that you disable Transparent HugePages",
+# que é o 'never' do preinstall: a role só confere, sem alterar.
+# Fonte: Restrictions for HugePages and Transparent HugePages Configurations (19c)
+# https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/configuring-operating-systems-for-oracle-database-on-linux/restrictions-for-hugepages-and-transparent-hugepages-configurations.html
+- name: Host | Tipo de kernel (regra de THP)
+  ansible.builtin.set_fact:
+    _hp_uek: "{{ 'uek' in ansible_facts['kernel'] }}"
+
 - name: Host | Kernel UEK7 ou superior (regra de THP desta role)
   ansible.builtin.assert:
-    that:
-      - "'uek' in ansible_facts['kernel']"
-      - ansible_facts['kernel'] is version('5.15', '>=')
+    that: ansible_facts['kernel'] is version('5.15', '>=')
     fail_msg: >-
       Kernel {{ ansible_facts['kernel'] }} fora da regra implementada (UEK7 ou superior → madvise).
       Para kernels anteriores o guia pede THP desabilitado; não implementado nesta versão.
     quiet: true
+  when: _hp_uek | bool
 
 - name: Host | THP madvise no GRUB_CMDLINE_LINUX (substitui valor existente)
   ansible.builtin.replace:
@@ -242,6 +252,7 @@
     replace: transparent_hugepage=madvise
     backup: true
   notify: Host | Regenerar grub.cfg e entradas BLS
+  when: _hp_uek | bool
 
 - name: Host | THP madvise no GRUB_CMDLINE_LINUX (acrescenta se ausente)
   ansible.builtin.lineinfile:
@@ -251,6 +262,7 @@
     backrefs: true
     backup: true
   notify: Host | Regenerar grub.cfg e entradas BLS
+  when: _hp_uek | bool
 
 - name: Host | THP em uso
   ansible.builtin.slurp:
@@ -260,4 +272,24 @@
 - name: Host | THP madvise em tempo de execução (procedimento do guia)
   ansible.builtin.shell: echo madvise > /sys/kernel/mm/transparent_hugepage/enabled
   changed_when: true
-  when: "'[madvise]' not in (_hp_thp.content | b64decode)"
+  when:
+    - _hp_uek | bool
+    - "'[madvise]' not in (_hp_thp.content | b64decode)"
+
+- name: Host | Kernel do GRUB_CMDLINE_LINUX (RHCK)
+  ansible.builtin.slurp:
+    src: /etc/default/grub
+  register: _hp_grub
+  when: not _hp_uek | bool
+
+- name: Host | THP desabilitado no RHCK (no boot e em uso)
+  ansible.builtin.assert:
+    that:
+      - (_hp_grub.content | b64decode) is search('GRUB_CMDLINE_LINUX="[^"]*transparent_hugepage=never')
+      - "'[never]' in (_hp_thp.content | b64decode)"
+    fail_msg: >-
+      Kernel {{ ansible_facts['kernel'] }} (RHCK): o guia recomenda THP desabilitado e o preinstall grava
+      transparent_hugepage=never. Em uso: {{ _hp_thp.content | b64decode | trim }}. Confira o
+      GRUB_CMDLINE_LINUX e o RPM preinstall; a role não altera o THP fora do UEK.
+    quiet: true
+  when: not _hp_uek | bool

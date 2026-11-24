@@ -1,0 +1,15 @@
+---
+argument_specs:
+  main:
+    short_description: Prepara o cluster RAC (discos do ASM por udev e SSH sem senha do dono).
+    description:
+      - Só no cenário rac_asm, com todos os nós de ora_rac_nodes na mesma execução.
+      - Só grava regra udev nova com os discos vazios (sem partição nem assinatura).
+      - Não particiona, não formata nem marca disco.
+    options:
+      ora_install_type: {type: str, required: true}
+      ora_owner: {type: str, required: true}
+      ora_asm: {type: dict, required: true}
+      ora_rac_nodes: {type: list, elements: dict, required: true}
+      ora_rac_prep_disk_group: {type: str}
+      ora_rac_prep_udev_rules: {type: path}

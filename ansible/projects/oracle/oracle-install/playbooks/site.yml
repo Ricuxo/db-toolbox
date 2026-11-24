@@ -7,6 +7,9 @@
 - name: Fase 10 — preparação do host
   ansible.builtin.import_playbook: 10_host_prep.yml
 
+- name: Fase 15 — preparação do cluster (só rac_asm)
+  ansible.builtin.import_playbook: 15_rac_prep.yml
+
 - name: Fase 20 — stage
   ansible.builtin.import_playbook: 20_stage.yml
 

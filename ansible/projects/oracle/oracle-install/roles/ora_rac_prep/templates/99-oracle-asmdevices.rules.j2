@@ -1,0 +1,7 @@
+# Gerado pela role ora_rac_prep (fase 15 do oracle-install). Não editar à mão.
+# Discos do ASM casados pelo WWN (ID_WWN_WITH_EXTENSION, o valor do link /dev/disk/by-id/wwn-*),
+# nunca pelo nome sdX. Dono {{ ora_owner }}, grupo {{ ora_rac_prep_disk_group }}, modo 0660.
+{% for d in ora_asm.disks %}
+# {{ d.label }}: {{ d.device }}
+KERNEL=="sd*", SUBSYSTEM=="block", ENV{ID_WWN_WITH_EXTENSION}=="{{ d.device | basename | regex_replace('^wwn-', '') }}", OWNER="{{ ora_owner }}", GROUP="{{ ora_rac_prep_disk_group }}", MODE="0660"
+{% endfor %}

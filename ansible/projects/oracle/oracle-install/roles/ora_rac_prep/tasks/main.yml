@@ -1,0 +1,218 @@
+---
+# Fase 15 — preparação do cluster (só rac_asm). Fontes (cwlin 19c):
+#   - "Configuring Device Persistence Manually for Oracle ASM": permissão 0660 para o dono da
+#     instalação e o grupo OSDBA do ASM; "On clustered systems, copy the rules.d file to all other
+#     nodes on the cluster"; "Verify that the device permissions and ownerships are set correctly".
+#     https://docs.oracle.com/en/database/oracle/oracle-database/19/cwlin/configuring-device-persistence-manually-for-oracle-asm.html
+#   - "Configuring SSH Manually on All Cluster Nodes": "Passwordless SSH configuration is a mandatory
+#     installation requirement"; chave RSA ou DSA em cada nó, ~/.ssh com 700, e "ssh hostname date"
+#     de cada nó para cada nó, inclusive para si mesmo, para registrar os nós no known_hosts.
+#     https://docs.oracle.com/en/database/oracle/oracle-database/19/cwlin/configuring-ssh-manually-on-all-cluster-nodes.html
+
+# ---------- Pré-condições (somente leitura) ----------
+- name: RAC prep | Só no cenário RAC
+  ansible.builtin.assert:
+    that: ora_install_type == 'rac_asm'
+    fail_msg: "Esta fase é do cenário rac_asm, e o host está em {{ ora_install_type }} (grupo do inventário)."
+    quiet: true
+
+- name: RAC prep | Todos os nós do cluster nesta execução
+  ansible.builtin.assert:
+    that: ora_rac_nodes | map(attribute='name') | difference(ansible_play_hosts_all) | length == 0
+    fail_msg: >-
+      A SSH sem senha e a regra udev precisam de todos os nós ({{ ora_rac_nodes | map(attribute='name') | list }})
+      na mesma execução; nesta estão {{ ansible_play_hosts_all }}.
+    quiet: true
+
+- name: RAC prep | Discos por WWN (/dev/disk/by-id/wwn-*)
+  ansible.builtin.assert:
+    that: ora_asm.disks | rejectattr('device', 'match', '^/dev/disk/by-id/wwn-0x[0-9a-f]+$') | list | length == 0
+    fail_msg: >-
+      A regra udev casa o disco pelo WWN: todo device de ora_asm precisa ser /dev/disk/by-id/wwn-0x...
+      Fora do padrão: {{ ora_asm.disks | rejectattr('device', 'match', '^/dev/disk/by-id/wwn-0x[0-9a-f]+$')
+      | map(attribute='device') | list }}
+    quiet: true
+
+- name: RAC prep | Disco visível neste nó
+  ansible.builtin.stat:
+    path: "{{ item.device }}"
+    follow: false
+  loop: "{{ ora_asm.disks }}"
+  loop_control:
+    label: "{{ item.label }} {{ item.device }}"
+  register: _rp_disk_stat
+
+- name: RAC prep | Todos os discos presentes (storage compartilhado)
+  ansible.builtin.assert:
+    that: _rp_disk_stat.results | rejectattr('stat.exists') | list | length == 0
+    fail_msg: >-
+      Discos de ora_asm ausentes em {{ inventory_hostname }}:
+      {{ _rp_disk_stat.results | rejectattr('stat.exists') | map(attribute='item.device') | list }}.
+      O storage do RAC precisa ser visto por todos os nós.
+    quiet: true
+
+- name: RAC prep | Tipo e partições de cada disco
+  ansible.builtin.command: lsblk -nro TYPE {{ item.device }}
+  loop: "{{ ora_asm.disks }}"
+  loop_control:
+    label: "{{ item.label }} {{ item.device }}"
+  register: _rp_lsblk
+  changed_when: false
+  check_mode: false
+
+- name: RAC prep | Disco inteiro, sem partição
+  ansible.builtin.assert:
+    that: item.stdout_lines == ['disk']
+    fail_msg: "{{ item.item.device }} não é um disco inteiro sem partição ({{ item.stdout_lines }})."
+    quiet: true
+  loop: "{{ _rp_lsblk.results }}"
+  loop_control:
+    label: "{{ item.item.label }}"
+
+# ---------- Regra udev ----------
+- name: RAC prep | Regra udev atual
+  ansible.builtin.slurp:
+    src: "{{ ora_rac_prep_udev_rules }}"
+  register: _rp_rules_now
+  failed_when: false
+
+- name: RAC prep | A regra muda?
+  ansible.builtin.set_fact:
+    _rp_rules_change: >-
+      {{ (_rp_rules_now.content | default('') | b64decode)
+         != lookup('ansible.builtin.template', '99-oracle-asmdevices.rules.j2') }}
+
+# Regra nova só com disco vazio: disco já usado pelo ASM (ou com filesystem) mostra a assinatura.
+- name: RAC prep | Assinatura nos discos (blkid -p)
+  ansible.builtin.command: blkid -p -o value -s TYPE {{ item.device }}
+  loop: "{{ ora_asm.disks }}"
+  loop_control:
+    label: "{{ item.label }} {{ item.device }}"
+  register: _rp_blkid
+  changed_when: false
+  failed_when: _rp_blkid.rc not in [0, 2]
+  check_mode: false
+  when: _rp_rules_change | bool
+
+- name: RAC prep | Só grava regra nova com os discos vazios
+  ansible.builtin.assert:
+    that: _rp_blkid.results | selectattr('stdout', 'truthy') | list | length == 0
+    fail_msg: >-
+      A regra udev mudaria, mas há disco com assinatura:
+      {{ _rp_blkid.results | selectattr('stdout', 'truthy') | map(attribute='item.device') | zip(
+         _rp_blkid.results | selectattr('stdout', 'truthy') | map(attribute='stdout')) | list }}.
+      Nada foi alterado: confira se o disco é do ASM em uso antes de mexer na regra.
+    quiet: true
+  when: _rp_rules_change | bool
+
+- name: RAC prep | Regra udev dos discos do ASM (igual em todos os nós)
+  ansible.builtin.template:
+    src: 99-oracle-asmdevices.rules.j2
+    dest: "{{ ora_rac_prep_udev_rules }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: _rp_rules
+
+- name: RAC prep | Recarregar o udev e aplicar nos discos
+  ansible.builtin.shell: |
+    set -e
+    udevadm control --reload-rules
+    udevadm trigger --action=change {{ _rp_disk_stat.results | map(attribute='stat.lnk_source') | join(' ') }}
+    udevadm settle
+  changed_when: true
+  when: _rp_rules is changed
+
+- name: RAC prep | Dono, grupo e modo de cada disco
+  ansible.builtin.stat:
+    path: "{{ item.device }}"
+    follow: true
+  loop: "{{ ora_asm.disks }}"
+  loop_control:
+    label: "{{ item.label }} {{ item.device }}"
+  register: _rp_perm
+  when: not ansible_check_mode
+
+- name: RAC prep | Discos com {{ ora_owner }}:{{ ora_rac_prep_disk_group }} 0660
+  ansible.builtin.assert:
+    that:
+      - item.stat.pw_name == ora_owner
+      - item.stat.gr_name == ora_rac_prep_disk_group
+      - item.stat.mode == '0660'
+    fail_msg: >-
+      {{ item.item.device }} está {{ item.stat.pw_name }}:{{ item.stat.gr_name }} {{ item.stat.mode }};
+      esperado {{ ora_owner }}:{{ ora_rac_prep_disk_group }} 0660.
+    quiet: true
+  loop: "{{ _rp_perm.results }}"
+  loop_control:
+    label: "{{ item.item.label }}"
+  when: not ansible_check_mode
+
+# ---------- SSH sem senha do dono do software ----------
+- name: RAC prep | Diretório ~/.ssh do dono (700)
+  ansible.builtin.file:
+    path: "~{{ ora_owner }}/.ssh"
+    state: directory
+    owner: "{{ ora_owner }}"
+    mode: "0700"
+  become: true
+  become_user: "{{ ora_owner }}"
+
+- name: RAC prep | Chave RSA do dono (só se ausente)
+  ansible.builtin.command: ssh-keygen -q -t rsa -N '' -f .ssh/id_rsa
+  args:
+    chdir: "~{{ ora_owner }}"
+    creates: "~{{ ora_owner }}/.ssh/id_rsa"
+  become: true
+  become_user: "{{ ora_owner }}"
+
+- name: RAC prep | Chave pública do dono
+  ansible.builtin.slurp:
+    src: "~{{ ora_owner }}/.ssh/id_rsa.pub"
+  register: _rp_pubkey
+  failed_when: false
+
+- name: RAC prep | Chave de host ed25519 deste nó
+  ansible.builtin.slurp:
+    src: /etc/ssh/ssh_host_ed25519_key.pub
+  register: _rp_hostkey
+
+- name: RAC prep | Nomes deste nó para o known_hosts
+  ansible.builtin.set_fact:
+    _rp_names: "{{ [inventory_hostname, ansible_facts['nodename'], ansible_host | default(inventory_hostname)] | unique }}"
+
+- name: RAC prep | Chave de cada nó no authorized_keys
+  ansible.posix.authorized_key:
+    user: "{{ ora_owner }}"
+    key: "{{ hostvars[item]._rp_pubkey.content | b64decode }}"
+  loop: "{{ ora_rac_nodes | map(attribute='name') | list }}"
+  when: hostvars[item]._rp_pubkey.content is defined     # em --check a chave pode ainda não existir
+
+- name: RAC prep | Pares "nó nome" para o known_hosts
+  ansible.builtin.set_fact:
+    _rp_known: >-
+      {{ _rp_known | default([])
+         + (hostvars[item]._rp_names | map('regex_replace', '^', item ~ ' ') | list) }}
+  loop: "{{ ora_rac_nodes | map(attribute='name') | list }}"
+
+# A chave vem do próprio nó, lida pela conexão do Ansible: dispensa o ssh-keyscan pela rede.
+- name: RAC prep | Nós no known_hosts do dono
+  ansible.builtin.known_hosts:
+    path: "~{{ ora_owner }}/.ssh/known_hosts"
+    name: "{{ item.split()[1] }}"
+    key: "{{ item.split()[1] }} {{ (hostvars[item.split()[0]]._rp_hostkey.content | b64decode).split()[0:2] | join(' ') }}"
+    state: present
+  loop: "{{ _rp_known }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+
+- name: RAC prep | ssh <nó> date de cada nó para cada nome, inclusive para si mesmo
+  ansible.builtin.command:
+    argv: [ssh, -o, BatchMode=yes, -o, StrictHostKeyChecking=yes, -o, ConnectTimeout=10, "{{ item.split()[1] }}", date]
+  loop: "{{ _rp_known }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  changed_when: false
+  check_mode: false
+  when: not ansible_check_mode

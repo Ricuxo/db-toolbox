@@ -1,0 +1,6 @@
+---
+# Grupo dos discos do ASM: o OSDBA do ASM (asmdba), com 0660 para o dono da instalação.
+# Fonte: cwlin 19c, "Configuring Device Persistence Manually for Oracle ASM"
+# https://docs.oracle.com/en/database/oracle/oracle-database/19/cwlin/configuring-device-persistence-manually-for-oracle-asm.html
+ora_rac_prep_disk_group: asmdba
+ora_rac_prep_udev_rules: /etc/udev/rules.d/99-oracle-asmdevices.rules

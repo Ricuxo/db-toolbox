@@ -1,0 +1,17 @@
+---
+# Fase 15 — só rac_asm: regra udev dos discos do ASM (por WWN) e SSH sem senha do dono entre os nós.
+# Roda em todos os nós do cluster de uma vez. Precisa da fase 10 (grupos do ASM e dono).
+- name: Preparação do cluster RAC
+  hosts: "{{ ora_hosts | default('oracle_rac') }}"
+  gather_facts: true
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Guarda de ambiente
+      ansible.builtin.import_role:
+        name: ora_env
+      tags: [always]                # roda mesmo com --tags/--skip-tags
+      vars:
+        ora_env_phase_types: [rac_asm]
+  roles:
+    - role: ora_rac_prep
+      tags: [rac_prep]

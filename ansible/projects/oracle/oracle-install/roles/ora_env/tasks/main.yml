@@ -29,7 +29,15 @@
     fail_msg: >-
       ora_install_type {{ ('= "' ~ ora_install_type ~ '" não está em ' ~ ora_install_types)
       if ora_install_type is defined else 'não definido' }}. Ele vem do grupo do host no inventário
-      (oracle_restart ou oracle_si, em group_vars/<grupo>/main.yml).
+      (oracle_restart, oracle_si ou oracle_rac, em group_vars/<grupo>/main.yml).
+    quiet: true
+
+- name: Ambiente | Cenário tratado por esta fase
+  ansible.builtin.assert:
+    that: ora_install_type in ora_env_phase_types
+    fail_msg: >-
+      Esta fase ainda não trata o cenário {{ ora_install_type }} (trata {{ ora_env_phase_types }}).
+      Nada foi alterado.
     quiet: true
 
 - name: Ambiente | Variáveis do cenário si_fs (group_vars/oracle_si)

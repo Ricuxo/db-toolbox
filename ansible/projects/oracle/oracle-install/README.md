@@ -7,11 +7,14 @@ Escopo atual: **19c · Oracle Linux 9 · dono único `oracle`**, em dois cenári
 |---|---|---|---|
 | `restart_asm` | `oracle_restart` | Oracle Restart (Grid standalone) + ASM (ASMLib v3); banco em ASM; GIRU nos dois homes | 00 10 20 30 40 50 60 65 70 |
 | `si_fs` | `oracle_si` | Só o banco (Single Instance, sem Grid) em filesystem; DB RU; listener do home; início no boot por `dbstart`/`dbora` | 00 10 20 50 55 60 62 65 70 |
+| `rac_asm` | `oracle_rac` | RAC: Grid Infrastructure for a Cluster + ASM com discos por regra udev (WWN), sem ASMLib; RU do próprio grupo (`playbooks/group_vars/oracle_rac/media.yml`). **Em construção** (desenho em `DESENHO-RAC.md`) | prontas: 00 10 15 |
 
 **O cenário vem do grupo do host no inventário** (`group_vars/<grupo>/main.yml` define
 `ora_install_type`), do mesmo jeito que o ambiente vem do `-i`. As fases comuns miram no grupo
 `oracle`; a 30 e a 40 só em `oracle_restart`; a 55 e a 62 só em `oracle_si`. Cada uma recusa o
-cenário errado, mesmo forçada com `-e ora_hosts=`. RAC: fora do escopo por enquanto.
+cenário errado, mesmo forçada com `-e ora_hosts=`. A 15 só roda em `oracle_rac`. As fases que ainda não
+tratam o `rac_asm` (20 a 70) deixam o `oracle_rac` fora do alvo padrão e recusam o host RAC na guarda
+de ambiente (`ora_env_phase_types`).
 
 ## Princípios
 
@@ -31,7 +34,7 @@ cenário errado, mesmo forçada com `-e ora_hosts=`. RAC: fora do escopo por enq
   apagados ao fim.
 - Não altera SELinux, firewall, swap nem discos. No GRUB, só o THP: o RPM preinstall 19c
   grava `transparent_hugepage=never`, e a role troca para `madvise` como manda o guia 19c
-  para UEK7 ou superior. O `numa=off` do preinstall é documentado e fica. **A role não
+  para UEK7 ou superior. No RHCK (ex.: RAC na 19.30, que não suporta UEK 8) a role só confere o `never`. O `numa=off` do preinstall é documentado e fica. **A role não
   reinicia o servidor**: o boot novo vale no próximo reinício, em janela.
 - Depois de **atualizar o RPM preinstall**, rode a fase 10 de novo: o script do RPM pode
   regravar `transparent_hugepage=never`.
@@ -43,6 +46,7 @@ cenário errado, mesmo forçada com `-e ora_hosts=`. RAC: fora do escopo por enq
 | 1 | Validar pré-requisitos de SO — **triagem** (só bloqueios de infra) |
 | 2 | `playbooks/00_gate.yml` — gate (só leitura) |
 | 3 | `playbooks/10_host_prep.yml` — preinstall + pacotes + `kernel.panic` (exigido pelo gridSetup 19.32) + nome do servidor no `/etc/hosts` (com ou sem DNS) + grupos de ASM (se `ora_asm`) + diretórios OFA + stage + `/dev/shm` |
+| 3a | `playbooks/15_rac_prep.yml` — **só `rac_asm`**, todos os nós de uma vez: regra udev dos discos do ASM por WWN (`oracle:asmdba 0660`, igual nos nós, regra nova só com disco vazio) e SSH sem senha do `oracle` entre os nós (`authorized_keys`, `known_hosts` com a chave de host lida do próprio nó, teste `ssh <nó> date`; cwlin 19c) |
 | 4 | Validar pré-requisitos de SO — **confirmação** (todos os itens) |
 | 5 | Copiar a mídia para `ora_stage_dir` e preencher `ora_media` com os sha256 do MOS |
 | 6 | `playbooks/20_stage.yml` — recolhe a mídia (se configurado), verifica (presença e sha256) e descompacta RU e one-offs |
@@ -131,8 +135,9 @@ servidores Oracle em `group_vars/oracle/main.yml`; o que é de um servidor só e
 | `ora_asm` | host_vars | discos (`label` + `device` por `/dev/disk/by-id/`) e diskgroups; o 1º diskgroup é criado no gridSetup |
 | `ora_media.asmlib` | projeto (`media.yml`) | RPM `oracleasmlib` (file + sha256), baixado pelo DBA |
 | `ora_media.cvu` | projeto (`media.yml`) | CVU avulso do MOS (patch 30839369): **não** usado na 19c em OL9 (sem dados de referência); mapeado para 26ai |
-| `ora_grid_home` | inventário (`group_vars/oracle`) | `{{ ora_base }}/product/19.0.0/grid` (OFA, standalone, dono único) |
-| `ora_db_home` | inventário (`group_vars/oracle`) | `{{ ora_base }}/product/19.0.0/dbhome_1` (OFA) |
+| `ora_home_version` | inventário (`group_vars/oracle`) | `<major>.<ru>.0.0` tirado do `ora_ru`; nome dos homes |
+| `ora_grid_home` | inventário (`group_vars/oracle`) | `{{ ora_base }}/product/<major>.<ru>.0.0/grid`, ex.: `19.32.0.0` (OFA, standalone, dono único; nomenclatura da casa) |
+| `ora_db_home` | inventário (`group_vars/oracle`) | `{{ ora_base }}/product/<major>.<ru>.0.0/dbhome_1` (OFA; nomenclatura da casa) |
 | `ora_db_edition` | defaults `ora_db_software` | `EE` (padrão da casa) |
 | `ora_db_name`, `ora_pdb_name`, `ora_db_total_memory_mb`, `ora_db_fra_size_mb`, `ora_db_redo_size_mb` | host_vars | banco da fase 60 |
 | `ora_db_services` | host_vars | serviços da fase 65: lista de `{name, pdb}` |

@@ -178,7 +178,9 @@ coisa. Se o achado for novo e confirmado, sugira acrescentá-lo ao arquivo.
 - Patch ou RU num ambiente já instalado (o antigo "Fluxo B"). O caminho é um projeto próprio,
   ainda inexistente.
 - Segundo Oracle home ao lado de banco existente: projeto separado, por decisão do DBA.
-- RAC, banco em filesystem sem ASM, versões além da 19c, separação de papéis (usuário `grid`).
+- RAC além das fases prontas: o cenário `rac_asm` (grupo `oracle_rac`) está em construção, com as
+  fases 00, 10 e 15 prontas e as demais recusando o cenário (desenho em `oracle-install/DESENHO-RAC.md`).
+- Banco em filesystem sem ASM, versões além da 19c, separação de papéis (usuário `grid`).
 
 Para essas situações, não sugira roles da oravirt nem adapte as fases de instalação.
 

@@ -2,7 +2,7 @@
 # Fase 50 — software do Oracle Database (só software) no servidor com Oracle Restart.
 # Precisa das fases 10–40. Não usa senha (o banco é criado na fase 60).
 - name: Oracle Database — software
-  hosts: "{{ ora_hosts | default('oracle') }}"
+  hosts: "{{ ora_hosts | default('oracle:!oracle_rac') }}"   # rac_asm: fase ainda não implementada
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:

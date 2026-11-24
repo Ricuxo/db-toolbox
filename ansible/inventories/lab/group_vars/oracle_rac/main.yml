@@ -1,0 +1,35 @@
+---
+# Cenário RAC: Grid Infrastructure for a Cluster (Standalone Cluster) + ASM, discos com dono e
+# permissão por regra udev casada pelo WWN (fase 15), sem ASMLib e sem AFD. Banco RAC em ASM.
+ora_install_type: rac_asm
+
+# cwlin 19c, "About the Oracle Home Directory for Oracle Grid Infrastructure": num cluster o Grid home
+# "must not be placed under one of the Oracle base directories" (exemplo do guia: /u01/app/19.0.0/grid).
+# O nome <major>.<ru>.0.0 vem de ora_home_version (group_vars/oracle).
+ora_grid_home: "{{ ora_app_dir }}/{{ ora_home_version }}/grid"
+
+# Cluster (chaves do template oficial install/response/gridsetup.rsp da mídia 19.3).
+ora_rac_cluster_name: orclrac
+ora_rac_scan_name: orclrac-scan.oracle.local     # DNS local (dnsmasq no orclrac1), 3 IPs
+ora_rac_scan_port: 1521
+ora_rac_nodes:                                   # clusterNodes = <nome público>:<VIP>
+  - {name: orclrac1, vip: orclrac1-vip}
+  - {name: orclrac2, vip: orclrac2-vip}
+ora_rac_interfaces:                              # networkInterfaceList: 1 = PUBLIC, 5 = ASM & PRIVATE
+  - {name: eth0, subnet: 192.168.15.0, type: 1}
+  - {name: eth1, subnet: 10.10.10.0, type: 5}
+
+# LUNs iSCSI (alvo 192.168.15.3, iqn.2024-01.com.vpslab:rac-storage), por WWN. O label é o nome do LUN.
+ora_asm:
+  disks:
+    - {label: OCR1,  device: /dev/disk/by-id/wwn-0x600140519b9a8a6ed59415fa8f90e2de}   # lun-ocr-vote1
+    - {label: OCR2,  device: /dev/disk/by-id/wwn-0x60014052ac969a71c904789b6e3dd3f3}   # lun-ocr-vote2
+    - {label: OCR3,  device: /dev/disk/by-id/wwn-0x6001405b4a3c5d193b744e09b691c978}   # lun-ocr-vote3
+    - {label: DATA1, device: /dev/disk/by-id/wwn-0x600140520498f4576174113b847672ce}   # lun-data1
+    - {label: FRA1,  device: /dev/disk/by-id/wwn-0x6001405c474ebfd1f0242cea8a15ceeb}   # lun-fra1
+  diskgroups:                                    # o 1º (OCR e voting files) é criado no gridSetup
+    - {name: OCR,  redundancy: EXTERNAL, disks: [OCR1, OCR2, OCR3]}
+    - {name: DATA, redundancy: EXTERNAL, disks: [DATA1]}
+    - {name: FRA,  redundancy: EXTERNAL, disks: [FRA1]}
+# O LUN lun-gimr (wwn-0x60014058d49c6e5436b460dad0190730, 40 GB) fica fora: sem GIMR neste lab
+# (decisão do DBA, 2026-11-24).

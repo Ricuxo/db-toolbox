@@ -1,7 +1,7 @@
 ---
 # Fase 65 — serviços do Oracle Restart para as PDBs (idempotente). Precisa da fase 60.
 - name: Oracle Database — serviços das PDBs
-  hosts: "{{ ora_hosts | default('oracle') }}"
+  hosts: "{{ ora_hosts | default('oracle:!oracle_rac') }}"   # rac_asm: fase ainda não implementada
   gather_facts: false
   any_errors_fatal: true
   pre_tasks:
