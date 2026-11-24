@@ -1,5 +1,5 @@
 ---
-# orcl02 (VM orcl-02, 192.168.15.151; antes "testeskill") — laboratório para testes. 19c, Oracle Restart, ASM (ASMLib v3), OL 9.8 UEK 8.
+# orcl02 (VM orcl-02, hostname orcldb02, 192.168.15.151) — laboratório para testes. 19c, Oracle Restart, ASM (ASMLib v3), OL 9.9 UEK 8.
 
 # Teste do DBA (fase 20 do oracle-install): mídia deixada em /u01 em vez do stage; a fase recolhe de lá.
 ora_stage_collect_from: [/u01]
@@ -9,8 +9,9 @@ ora_asm:
   disks:
     # Sempre por identificador estável, nunca /dev/sdX ou /dev/nvmeXnY (os nomes mudam entre boots).
     # Em disco NVMe virtual do VMware usar nvme-eui.* (o caminho nvme-VMware_… repete o serial).
-    # 6ª VM (2026-11-16, discos SCSI): WWN conferido com o ddb.uuid de orcl-02-0.vmdk
-    # (slot scsi0:2, 60G, partição MBR vazia). O /u01 ficou em orcl-02.vmdk (wwn-0x6000c299edf8…).
+    # PENDENTE: o disco abaixo não existe no servidor. Hoje há só o /u01 (80G,
+    # wwn-0x6000c29546a14a79cad9d832996c44f3) e o disco do sistema (60G). Anexar um disco vazio
+    # e trocar o device do DATA01 pelo by-id dele antes da fase 30.
     - {label: DATA01, device: /dev/disk/by-id/wwn-0x6000c29fed9d027478749aaf5a6153e1}
   diskgroups:
     - {name: DATA, redundancy: EXTERNAL, disks: [DATA01]}
