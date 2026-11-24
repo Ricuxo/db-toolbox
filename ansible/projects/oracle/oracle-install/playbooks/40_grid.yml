@@ -3,7 +3,7 @@
 # (rac_asm, precisa das fases 10, 15 e 20; todos os nós de uma vez). Precisa de
 # vault_ora_sysasm_password / vault_ora_asmsnmp_password (group_vars/all/vault.yml).
 - name: Oracle Grid Infrastructure
-  hosts: "{{ ora_hosts | default('oracle_restart:oracle_rac') }}"
+  hosts: "{{ ora_hosts | default('oracle') }}:&oracle:!oracle_si"   # Restart e RAC (no site.yml, o SI pula)
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:

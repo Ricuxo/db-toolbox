@@ -27,7 +27,7 @@ ansible-playbook -i ../../../inventories/<amb> playbooks/<fase>.yml -e ora_hosts
 |---|---|---|
 | `restart_asm` | `oracle_restart` | 00 10 20 30 40 50 60 65 70 |
 | `si_fs` | `oracle_si` | 00 10 20 50 55 60 62 65 70 |
-| `rac_asm` | `oracle_rac` | **em construção**: 00 10 15 prontas; 20 a 70 ainda recusam o cenário (use o comando manual) |
+| `rac_asm` | `oracle_rac` | **em construção**: 00 10 15 20 prontas, 40 escrita; 50 a 70 ainda recusam o cenário (use o comando manual) |
 
 ## Itens
 

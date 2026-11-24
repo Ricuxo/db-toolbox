@@ -11,10 +11,10 @@ Escopo atual: **19c · Oracle Linux 9 · dono único `oracle`**, em dois cenári
 
 **O cenário vem do grupo do host no inventário** (`group_vars/<grupo>/main.yml` define
 `ora_install_type`), do mesmo jeito que o ambiente vem do `-i`. As fases comuns miram no grupo
-`oracle`; a 30 e a 40 só em `oracle_restart`; a 55 e a 62 só em `oracle_si`. Cada uma recusa o
-cenário errado, mesmo forçada com `-e ora_hosts=`. A 15 só roda em `oracle_rac`. As fases que ainda não
-tratam o `rac_asm` (20 a 70) deixam o `oracle_rac` fora do alvo padrão e recusam o host RAC na guarda
-de ambiente (`ora_env_phase_types`).
+`oracle`. As de um cenário só (15 no RAC, 30 no Restart, 55 e 62 no SI) e a 40 (Restart e RAC) ficam só
+com os hosts do grupo delas: com outro alvo, a fase é pulada ("no hosts matched"), e é isso que deixa o
+`site.yml` rodar em qualquer cenário. As fases que ainda não tratam o `rac_asm` (50 a 70) recusam o
+host RAC na guarda de ambiente (`ora_env_phase_types`).
 
 ## Princípios
 
@@ -61,54 +61,134 @@ de ambiente (`ora_env_phase_types`).
 
 ## Como rodar
 
+### Uma vez, antes de tudo
+
 ```bash
+cd ansible/projects/oracle/oracle-install
 ansible-galaxy collection install -r requirements.yml -p collections
-ansible-playbook -i ../../../inventories/lab playbooks/00_gate.yml --check            # nada muda
-ansible-playbook -i ../../../inventories/lab playbooks/10_host_prep.yml --check --diff
-ansible-playbook -i ../../../inventories/lab playbooks/10_host_prep.yml
 ```
 
-**Inventário e ambiente.** O inventário é compartilhado por todos os projetos e fica fora deste,
-em `db-toolbox/ansible/inventories/<amb>/` (daqui: `../../../inventories/<amb>`). Só o modelo
-`inventories/example/` é versionado; os inventários reais ficam fora do git. Cada ambiente
-(`lab`, `dev`, `hml`, `prod`) tem o seu diretório, e **o ambiente é o `-i` do comando**: com
-`-i .../inventories/dev`, os servidores de produção não existem para o Ansible. Não há inventário
-padrão no `ansible.cfg`, de propósito: sem `-i`, nenhum host casa e nada roda.
+E o inventário do ambiente: copie `ansible/inventories/example/` para `ansible/inventories/<amb>/` e
+preencha (seção "Incluir um servidor", abaixo, e o `README.md` do exemplo), incluindo o `vault.yml`.
 
-Todo playbook começa pela role `ora_env`, que mostra o ambiente e recusa rodar se o `ora_env`
-(`inventories/<amb>/group_vars/all/main.yml`) faltar ou não estiver em `lab`, `dev`, `hml` ou
-`prod`. A fase 70 reinicia o banco: em `prod` ela exige repetir o ambiente na linha de comando,
-`-e ora_confirm_env=prod`.
+### Regras de toda execução
 
-Alvo padrão: grupo `oracle_restart`. Outro alvo: `-e ora_hosts=<grupo|host>`.
+- **Rode de dentro do `oracle-install`.** O `ansible.cfg` daqui aponta roles, collections e `become`.
+- **`-i ../../../inventories/<amb>`** diz o ambiente. Sem `-i`, nenhum host casa e nada roda.
+- **`-e ora_hosts=<alvo>`** diz o servidor: o nome do host (Restart, SI) ou o nome do cluster (RAC).
+  Sem ele, a fase mira em todos os servidores do ambiente, e uma falha em qualquer um para todos
+  (`any_errors_fatal`).
+- **`--check` primeiro** (nada muda), depois sem `--check`.
+- **`--ask-vault-pass`** nas fases 40 e 60 e no `site.yml` (pedem as senhas, até em `--check`).
+- Fase 70 e `site.yml` em `prod`: `-e ora_confirm_env=prod`.
 
-### Instalação completa (`playbooks/site.yml`)
+Nos exemplos, os alvos são os do inventário modelo: `srvrestart01` (Restart), `srvsi01` (SI) e
+`rac_cluster01` (RAC, nós `srvrac01` e `srvrac02`). Troque pelos seus.
 
-O `site.yml` importa as fases 00 a 70 em ordem. Roteiro para servidor novo:
+### Execução completa (`playbooks/site.yml`)
+
+O `site.yml` roda as fases 00 a 70 em ordem, no alvo do `-e ora_hosts`. Fase que não é do cenário do
+alvo é pulada ("no hosts matched"): Restart pula 15, 55 e 62; SI pula 15, 30 e 40; RAC pula 30, 55 e 62.
+São três passos, porque a mídia só pode ser copiada depois que a fase 10 cria o stage:
+
+1. Fases 00 e 10 sozinhas (gate e preparação do host).
+2. À mão: copiar a mídia para `/u01/stage` (no RAC, só no 1º nó de `ora_rac_nodes`) com o nome que está
+   no catálogo da RU, e reiniciar o servidor **se a fase 10 alterou o GRUB** (THP `madvise`, só em UEK).
+3. O `site.yml` inteiro. As fases 00 e 10 rodam de novo sem mudar nada.
+
+**Oracle Restart** (`srvrestart01`):
 
 ```bash
-cd /projetos/DESENVOLVIMENTO/desenvolvimento/db-toolbox/ansible/projects/oracle/oracle-install
-ansible-playbook -i ../../../inventories/lab playbooks/00_gate.yml
-ansible-playbook -i ../../../inventories/lab playbooks/10_host_prep.yml
-# reiniciar o servidor (GRUB da fase 10) e copiar a mídia para /u01/stage
-time ansible-playbook -i ../../../inventories/lab playbooks/site.yml --ask-vault-pass
+ansible-playbook -i ../../../inventories/<amb> playbooks/00_gate.yml      -e ora_hosts=srvrestart01 --check
+ansible-playbook -i ../../../inventories/<amb> playbooks/10_host_prep.yml -e ora_hosts=srvrestart01
+# copiar a mídia para /u01/stage; reiniciar se a fase 10 alterou o GRUB
+time ansible-playbook -i ../../../inventories/<amb> playbooks/site.yml    -e ora_hosts=srvrestart01 --ask-vault-pass
 ```
 
-- **Rodar de dentro do `oracle-install`:** o `ansible.cfg` daqui aponta roles, collections e `become`.
-- **`--ask-vault-pass` é obrigatório:** as fases 40 e 60 usam as senhas (pedida uma vez, no início).
-- **Mídia antes da fase 20:** o stage só existe depois da fase 10, por isso a 10 roda antes,
-  sozinha. Alternativa: deixar a mídia em um diretório de `ora_stage_collect_from` (no lab, `/u01`).
-  As fases 00 e 10 rodam de novo dentro do `site.yml` sem mudar nada.
-- **Reboot depois da fase 10:** o GRUB (THP `madvise`, `numa=off`) só vale no próximo boot e o
-  `site.yml` não reinicia o servidor. Todas as instalações testadas tiveram esse reboot; sem ele,
-  não testado.
-- **Falha no meio:** o `site.yml` não retoma. As fases 40, 50 e 60 recusam o que já foi feito;
-  depois de corrigir, rode uma a uma a partir da que falhou. Na fase 70, "O kernel alocou X de Y
-  HugePages" pede reboot do servidor e a fase de novo (não repetir sem o reboot).
-- **Produção:** o `site.yml` inclui a fase 70 (reinicia o banco) e exige `-e ora_confirm_env=prod`.
-- **Cenário `si_fs`:** o mesmo `site.yml` serve; as fases 30 e 40 não casam host e as 55 e 62 entram.
-  A mídia é só a do banco: `db_base`, OPatch, DB RU e os one-offs. O disco dos datafiles tem de estar
-  montado em `/u02` antes da fase 10. Um reboot depois da instalação prova o `dbora`.
+**Single Instance em filesystem** (`srvsi01`; o disco dos datafiles já montado em `/u02`):
+
+```bash
+ansible-playbook -i ../../../inventories/<amb> playbooks/00_gate.yml      -e ora_hosts=srvsi01 --check
+ansible-playbook -i ../../../inventories/<amb> playbooks/10_host_prep.yml -e ora_hosts=srvsi01
+# copiar a mídia do banco para /u01/stage; reiniciar se a fase 10 alterou o GRUB
+time ansible-playbook -i ../../../inventories/<amb> playbooks/site.yml    -e ora_hosts=srvsi01 --ask-vault-pass
+```
+
+**RAC** (`rac_cluster01`). **Hoje só até a fase 40** (Grid do cluster): as fases 50 a 70 ainda não
+tratam o `rac_asm` e recusam o cluster ("Esta fase ainda não trata o cenário rac_asm"), então o
+`site.yml` para na 50. Até elas ficarem prontas, rode o RAC por etapas (abaixo).
+
+```bash
+ansible-playbook -i ../../../inventories/<amb> playbooks/00_gate.yml      -e ora_hosts=rac_cluster01 --check
+ansible-playbook -i ../../../inventories/<amb> playbooks/10_host_prep.yml -e ora_hosts=rac_cluster01
+# copiar a mídia para /u01/stage do 1º nó; reiniciar se a fase 10 alterou o GRUB
+time ansible-playbook -i ../../../inventories/<amb> playbooks/site.yml    -e ora_hosts=rac_cluster01 --ask-vault-pass
+```
+
+### Execução por etapas
+
+Uma fase por vez, cada uma em `--check` e depois de verdade. É o jeito de acompanhar cada passo, de
+retomar depois de uma falha e, por enquanto, o único jeito no RAC. O padrão de todo comando:
+
+```bash
+ansible-playbook -i ../../../inventories/<amb> playbooks/<fase>.yml -e ora_hosts=<alvo> --check   # confere
+ansible-playbook -i ../../../inventories/<amb> playbooks/<fase>.yml -e ora_hosts=<alvo>           # executa
+```
+
+| Fase | Restart | SI | RAC | Observação |
+|---|---|---|---|---|
+| `00_gate` | sim | sim | sim | só leitura; recusa servidor com Oracle ou outro SGBD |
+| `10_host_prep` | sim | sim | sim | depois dela: copiar a mídia; reiniciar se alterou o GRUB |
+| `15_rac_prep` | — | — | sim | todos os nós de uma vez: regra udev dos discos e SSH entre os nós |
+| `20_stage` | sim | sim | sim | confere a mídia e extrai os patches; no RAC, só no 1º nó |
+| `30_asmlib` | sim | — | — | ASMLib v3 e marcação dos discos |
+| `40_grid` | sim | — | sim | `--ask-vault-pass`; de 30 a 60 min |
+| `50_db_software` | sim | sim | em construção | cerca de 15 min |
+| `55_listener` | — | sim | — | listener do DB home |
+| `60_dbca` | sim | sim | em construção | `--ask-vault-pass`; cerca de 30 min |
+| `62_autostart` | — | sim | — | banco no boot por `dbora` |
+| `65_db_service` | sim | sim | em construção | serviços das PDBs |
+| `70_hugepages` | sim | sim | em construção | **reinicia o banco**; em `prod`, `-e ora_confirm_env=prod` |
+
+Exemplo, RAC até o Grid:
+
+```bash
+ansible-playbook -i ../../../inventories/<amb> playbooks/00_gate.yml      -e ora_hosts=rac_cluster01 --check
+ansible-playbook -i ../../../inventories/<amb> playbooks/10_host_prep.yml -e ora_hosts=rac_cluster01 --check --diff
+ansible-playbook -i ../../../inventories/<amb> playbooks/10_host_prep.yml -e ora_hosts=rac_cluster01
+ansible-playbook -i ../../../inventories/<amb> playbooks/15_rac_prep.yml  -e ora_hosts=rac_cluster01 --check --diff
+ansible-playbook -i ../../../inventories/<amb> playbooks/15_rac_prep.yml  -e ora_hosts=rac_cluster01
+# copiar a mídia para /u01/stage do 1º nó (srvrac01)
+ansible-playbook -i ../../../inventories/<amb> playbooks/20_stage.yml     -e ora_hosts=rac_cluster01 --check
+ansible-playbook -i ../../../inventories/<amb> playbooks/20_stage.yml     -e ora_hosts=rac_cluster01
+ansible-playbook -i ../../../inventories/<amb> playbooks/40_grid.yml      -e ora_hosts=rac_cluster01 --check --ask-vault-pass
+ansible-playbook -i ../../../inventories/<amb> playbooks/40_grid.yml      -e ora_hosts=rac_cluster01 --ask-vault-pass
+```
+
+Restart e SI seguem a mesma ideia, com as fases marcadas "sim" na coluna do cenário, nesta ordem.
+
+### Se falhar no meio
+
+- **O `site.yml` não retoma.** As fases 40, 50 e 60 recusam servidor com instalação feita ou parcial.
+  Corrija a causa e continue por etapas a partir da fase que falhou.
+- **Fase 70:** "O kernel alocou X de Y HugePages" pede reboot do servidor e a fase de novo (não repita
+  sem o reboot).
+- **Execução longa em VM de notebook:** deixe a suspensão desligada (ela atrasa o relógio e pendura as
+  tarefas longas).
+- **SI:** um reboot depois da instalação prova o início automático (`dbora`).
+
+### Ambiente
+
+O inventário é compartilhado por todos os projetos e fica fora deste, em
+`db-toolbox/ansible/inventories/<amb>/` (daqui: `../../../inventories/<amb>`). Só o modelo
+`inventories/example/` é versionado; os inventários reais ficam fora do git. Cada ambiente (`lab`,
+`dev`, `hml`, `prod`) tem o seu diretório, e **o ambiente é o `-i` do comando**: com
+`-i .../inventories/dev`, os servidores de produção não existem para o Ansible. Não há inventário
+padrão no `ansible.cfg`, de propósito.
+
+Todo playbook começa pela role `ora_env`, que mostra o ambiente e o cenário e recusa rodar se o
+`ora_env` (`inventories/<amb>/group_vars/all/main.yml`) faltar, não estiver em `lab`, `dev`, `hml` ou
+`prod`, ou for diferente do nome do diretório.
 
 ## Incluir um servidor
 

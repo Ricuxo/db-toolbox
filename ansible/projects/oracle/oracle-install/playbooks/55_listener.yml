@@ -1,7 +1,7 @@
 ---
 # Fase 55 — listener do DB home (cenário si_fs). Depois da fase 50 e antes da 60.
 - name: Listener do banco (sem Grid)
-  hosts: "{{ ora_hosts | default('oracle_si') }}"
+  hosts: "{{ ora_hosts | default('oracle_si') }}:&oracle_si"   # só hosts do SI (no site.yml, os outros pulam)
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:

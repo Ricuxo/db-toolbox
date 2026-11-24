@@ -1,7 +1,7 @@
 ---
 # Fase 30 — ASMLib v3 e marcação dos discos de ora_asm (precisa das fases 10 e 20).
 - name: ASMLib v3
-  hosts: "{{ ora_hosts | default('oracle_restart') }}"
+  hosts: "{{ ora_hosts | default('oracle_restart') }}:&oracle_restart"   # só hosts do Restart (no site.yml, os outros pulam)
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:
