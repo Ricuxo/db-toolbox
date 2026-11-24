@@ -24,10 +24,11 @@ Centralizar scripts e automações utilizados no dia a dia como DBA, permitindo:
 ```bash
 db-toolbox/
 │
-├── ansible/
+├── ansible/                     # detalhes em ansible/README.md
+│   ├── inventories/<amb>/       # inventário compartilhado, um por ambiente
 │   └── projects/
-│       └── ansible-oracle/
-│           └── playbook/
+│       └── oracle/
+│           └── oracle-install/  # instalação Oracle 19c (Restart com ASM, SI em filesystem)
 │
 ├── automation/
 │   └── shell-script/
