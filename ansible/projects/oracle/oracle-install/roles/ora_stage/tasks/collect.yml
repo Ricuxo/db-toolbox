@@ -1,11 +1,10 @@
 ---
 # Recolhe para o stage a mídia do catálogo que o DBA deixou em outro diretório do servidor.
 # Só roda com ora_stage_collect_from preenchido. Regras (decisão do DBA, 2026-11-13):
-#   - só arquivo do catálogo (ora_media), e só o que falta no stage;
-#   - só se o sha256 na origem bater com o ora_media;
+#   - só arquivo do catálogo (ora_media, pelo nome), e só o que falta no stage;
 #   - só no mesmo filesystem do stage (rename instantâneo; nunca uma cópia escondida de GBs);
 #   - nunca sobrescreve (mv -n) e nunca apaga nada.
-# O verify, em seguida, confere o sha256 de novo já dentro do stage.
+# O verify, em seguida, confere que o arquivo está no stage.
 
 - name: Stage | Catálogo
   ansible.builtin.include_tasks: catalog.yml
@@ -30,11 +29,10 @@
     label: "{{ item.file }}"
   register: _collect_in_stage
 
-- name: Stage | Procurar e calcular sha256 nas origens (pode levar alguns minutos)
+- name: Stage | Procurar nas origens
   ansible.builtin.stat:
     path: "{{ item.1 }}/{{ item.0.file }}"
-    get_checksum: true
-    checksum_algorithm: sha256
+    get_checksum: false
   loop: >-
     {{ _collect_in_stage.results | rejectattr('stat.exists') | map(attribute='item')
        | product(ora_stage_collect_from) | list }}
@@ -54,14 +52,13 @@
            'file': item.item.0.file,
            'path': item.item.1 ~ '/' ~ item.item.0.file,
            'status': 'ausente' if not item.stat.exists
-                     else 'diverge' if item.stat.checksum != item.item.0.sha256 | lower
                      else 'outro_fs' if item.stat.dev != _collect_stage.stat.dev
                      else 'mover' }] }}
   loop: "{{ _collect_src.results }}"
   loop_control:
     label: "{{ item.item.1 }}/{{ item.item.0.file }}"
 
-- name: Stage | Mover para o stage (sha256 igual e mesmo filesystem)
+- name: Stage | Mover para o stage (mesmo filesystem)
   ansible.builtin.command:
     argv: [mv, -n, --, "{{ item.path }}", "{{ ora_stage_dir }}/{{ item.file }}"]
     creates: "{{ ora_stage_dir }}/{{ item.file }}"
@@ -91,7 +88,6 @@
   ansible.builtin.debug:
     msg:
       - "{{ 'Seriam movidos (--check: nada foi movido)' if ansible_check_mode else 'Movidos' }} para o stage: {{ _collect_mv.results | select('changed') | map(attribute='item.path') | join(', ') or 'nenhum' }}"
-      - "sha256 DIVERGE do ora_media (ficam na origem): {{ _f | selectattr('status', 'equalto', 'diverge') | map(attribute='path') | join(', ') or 'nenhum' }}"
       - "Em outro filesystem (ficam na origem; mova à mão): {{ _f | selectattr('status', 'equalto', 'outro_fs') | map(attribute='path') | join(', ') or 'nenhum' }}"
       - "Não encontrados nas origens: {{ _f | map(attribute='file') | unique | reject('in', _achados) | join(', ') or 'nenhum' }}"
   when: _f | length > 0

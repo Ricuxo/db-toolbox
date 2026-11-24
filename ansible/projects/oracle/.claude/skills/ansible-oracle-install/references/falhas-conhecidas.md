@@ -55,7 +55,6 @@ dizer comportamento visto e não regra documentada. **Nenhuma ação aqui é byp
 
 | Mensagem | Causa | Ação |
 |---|---|---|
-| `sha256 DIVERGE` | Download corrompido, ou o digest no catálogo está errado | Baixar de novo e reconferir no MOS. Se o MOS entregar um arquivo que diverge do digest publicado (caso 39932578), abrir SR. **Nunca** trocar o catálogo pelo hash do arquivo sem decisão do DBA (a única exceção registrada é o 39932578 no si_fs, em `media.yml`) |
 | AVISO "fora do catálogo" | Arquivo no stage que nenhuma fase usa | Ver o Passo 3 da skill (patch órfão) |
 | `/u01` é um **arquivo**, não um diretório | `scp` feito antes de o diretório existir | Não apagar: mover para fora e pedir ao DBA para copiar de novo para dentro do stage |
 | Fase 50 (si_fs): `INS-08101` em `supportedOSCheck`, `NullPointerException` em `StorageUtil` | Home sem o CVU novo: a DB RU não traz CVU, quem traz é o 39932578 (no Restart, a GIRU) | Conferir se o 39932578 está no catálogo do si_fs e extraído. O home fica com a RU aplicada e sem registro: limpar `dbhome_1` e o conteúdo do `oraInventory` com aprovação do DBA |

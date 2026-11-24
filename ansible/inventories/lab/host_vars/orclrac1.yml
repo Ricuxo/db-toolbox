@@ -1,6 +1,0 @@
----
-# Nó de instalação do RAC. Os patches da 19.30 foram copiados em subdiretórios do stage: a fase 20
-# os move para o topo (só com sha256 igual ao catálogo, no mesmo filesystem). Tirar depois da fase 20.
-ora_stage_collect_from:
-  - /u01/stage/patch_jan2026
-  - /u01/stage/patch_jan2026/bug_hostname_maiusculo

@@ -82,19 +82,18 @@ própria lista de `oneoffs`, sem o `_ora_oneoffs_common` da 19.32.
 ```yaml
 ora_ru: 19.30.0.0
 ora_media:
-  grid_base: {file: LINUX.X64_193000_grid_home.zip, sha256: d668002664d9399cf61eb03c0d1e3687121fc890b1ddd50b35dcbe13c5307d2e}
-  db_base:   {file: LINUX.X64_193000_db_home.zip,   sha256: ba8329c757133da313ed3b6d7f86c5ac42cd9970a28bf2e6233f3235233aa8d8}
-  opatch:    {file: p6880880_190000_Linux-x86-64.zip, sha256: <do MOS, conferir>}
-  ru_grid:   {file: p38629535_190000_Linux-x86-64.zip, patchid: "38629535", sha256: <do MOS>}  # GI RELEASE UPDATE 19.30.0.0.0
+  grid_base: {file: LINUX.X64_193000_grid_home.zip}
+  db_base:   {file: LINUX.X64_193000_db_home.zip}
+  opatch:    {file: p6880880_190000_Linux-x86-64.zip}
+  ru_grid:   {file: p38629535_190000_Linux-x86-64.zip, patchid: "38629535"}  # GI RELEASE UPDATE 19.30.0.0.0
   oneoffs:
-    - {file: p38609069_1930000DBRU_Generic.zip, patchid: "38609069", sha256: <do MOS>}  # overlay 19.30, GI e DB home; teste de rollback
+    - {file: p38609069_1930000DBRU_Generic.zip, patchid: "38609069"}  # overlay 19.30, GI e DB home; teste de rollback
 ```
 
 - Não há `ru_db`. Segundo a página da 19.32, o RAC usa a GIRU também no `runInstaller` do banco,
   como o `restart_asm`. Para a 19.30 isso fica **NÃO VERIFICADO** (não existe página da 19.30).
 - Não há `asmlib`. As chaves obrigatórias da fase 20 passam a depender do cenário.
-- Os sha256 vêm do MOS. O `PatchSearch.xml` do stage traz `AE077244…2DA61` (GIRU) e `6B9A2FFC…E7E6`
-  (38609069), e o DBA confirma os dois no MOS antes de colar.
+- A mídia é identificada só pelo nome do arquivo, sem checksum (decisão do DBA, como a oravirt).
 
 **Onde fica o catálogo (decisão do DBA):**
 - (a) `playbooks/group_vars/oracle_rac/media.yml` no projeto. Mantém a regra do README de que RU e
@@ -173,7 +172,7 @@ reinício é de uma instância por vez, com `srvctl stop/start instance`.
   A falta de página da 19.30 não prova que a 19.30 está livre do bug. Procure no MOS se há
   variante `_1930000…`.
 - Certificação do OL 9.9 com RHCK 5.14.0-741 para o 19c.
-- sha256 do OPatch no MOS (`20_stage.yml --check` confere com o valor do catálogo).
+- OPatch 12.2.0.1.56 e a GIRU baixada de novo no stage do `orclrac1`.
 - Ler os templates `db_install.rsp` e `dbca.rsp` da mídia e a página do cwlin sobre o `root.sh` em cluster.
 
 ## 7. Documentação

@@ -22,14 +22,14 @@ de ambiente (`ora_env_phase_types`).
   corrige no servidor.
 - **Documentação oficial** como fonte de todo requisito (links nos defaults das roles).
 - **Gate antes de qualquer mudança:** aborta com Oracle existente, estado parcial, outro SGBD,
-  ou SO fora do escopo. A mídia é verificada (presença e sha256) na fase 20, antes de extrair.
+  ou SO fora do escopo. A mídia é verificada (presença, pelo nome do arquivo) na fase 20, antes de extrair.
 - **Stage no servidor:** a fase 10 cria `ora_stage_dir` junto com os diretórios OFA; o DBA
   baixa a mídia do MOS e copia via `scp` para lá.
   Nada é copiado do controller. O stage nunca é apagado pelos playbooks. A fase 20 avisa (sem
   bloquear) sobre arquivos no stage que não estão no `ora_media`.
 - **Recolhimento opcional:** com `ora_stage_collect_from`, a fase 20 move para o stage a mídia do
-  catálogo deixada em outro diretório do servidor — só item que falta no stage, só com sha256
-  igual ao `ora_media`, só no mesmo filesystem (rename; nunca cópia de GBs), sem sobrescrever.
+  catálogo deixada em outro diretório do servidor — só item do `ora_media` (pelo nome) que falta no
+  stage, só no mesmo filesystem (rename; nunca cópia de GBs), sem sobrescrever.
 - **Senhas só no Ansible Vault.** Response files com dono `oracle`, modo `0600`, `no_log` e
   apagados ao fim.
 - Não altera SELinux, firewall, swap nem discos. No GRUB, só o THP: o RPM preinstall 19c
@@ -48,8 +48,8 @@ de ambiente (`ora_env_phase_types`).
 | 3 | `playbooks/10_host_prep.yml` — preinstall + pacotes + `kernel.panic` (exigido pelo gridSetup 19.32) + nome do servidor no `/etc/hosts` (com ou sem DNS) + grupos de ASM (se `ora_asm`) + diretórios OFA + stage + `/dev/shm` |
 | 3a | `playbooks/15_rac_prep.yml` — **só `rac_asm`**, todos os nós de uma vez: regra udev dos discos do ASM por WWN (`oracle:asmdba 0660`, igual nos nós, regra nova só com disco vazio) e SSH sem senha do `oracle` entre os nós (`authorized_keys`, `known_hosts` com a chave de host lida do próprio nó, teste `ssh <nó> date`; cwlin 19c) |
 | 4 | Validar pré-requisitos de SO — **confirmação** (todos os itens) |
-| 5 | Copiar a mídia para `ora_stage_dir` e preencher `ora_media` com os sha256 do MOS |
-| 6 | `playbooks/20_stage.yml` — recolhe a mídia (se configurado), verifica (presença e sha256) e descompacta RU e one-offs |
+| 5 | Copiar a mídia para `ora_stage_dir` com o nome que está no `ora_media` |
+| 6 | `playbooks/20_stage.yml` — recolhe a mídia (se configurado), verifica (presença pelo nome) e descompacta RU e one-offs |
 | 7 | `playbooks/30_asmlib.yml` — ASMLib v3 (`ol9_addons` + `oracleasmlib` do stage, `rpm -K`), partição GPT e `createdisk` (só disco vazio por `by-id`) |
 | 8 | `playbooks/40_grid.yml` — Grid/Restart: Grid home, OPatch, `cvuqdisk` da mídia, `gridSetup.sh -silent -applyRU -applyOneOffs` (gate: pré-requisitos integrados, já com a RU; rc 6 só passa com avisos listados em `ora_grid_accept_warnings`), `root.sh`, `-executeConfigTools` |
 | 9 | `playbooks/50_db_software.yml` — software do banco (só software) no `dbhome_1`: OPatch, `runInstaller -silent -applyRU <GIRU> -applyOneOffs` (banco em ASM com Restart usa a GIRU, página 19.32 das Release Notes; rc 6 só com avisos em `ora_db_accept_warnings`), `root.sh`; confere DB RU e one-offs no `opatch lspatches` | **Em `si_fs`**: `-applyRU <DBRU>` (página 19.32, "Single-instance Oracle Database"), sem exigir o Restart.
@@ -129,11 +129,11 @@ servidores Oracle em `group_vars/oracle/main.yml`; o que é de um servidor só e
 | `ora_supported_os` | projeto (`playbooks/group_vars/all`) | escopo de SO aceito pelo gate |
 | `ora_version` | inventário (`group_vars/oracle`) | release base da mídia, 4 partes (`19.3.0.0`) |
 | `ora_ru` | projeto (`media.yml`) | RU alvo, aplicado na instalação (`19.32.0.0`) |
-| `ora_media` | projeto (`media.yml`) | catálogo da mídia: `file` + `sha256` (+ `patchid` nos RUs) |
+| `ora_media` | projeto (`media.yml`) | catálogo da mídia: `file` (+ `patchid` nos RUs e one-offs); sem checksum |
 | `ora_install_type` | inventário (`group_vars/oracle_restart` ou `oracle_si`) | cenário: `restart_asm` ou `si_fs` |
 | `ora_db_data_mount`, `ora_db_data_dir`, `ora_db_fra_dir` | inventário (`group_vars/oracle_si`) | `si_fs`: `/u02` (tem de ser ponto de montagem), `/u02/app/oracle/oradata`, `<ORACLE_BASE>/fast_recovery_area` (OFA) |
 | `ora_asm` | host_vars | discos (`label` + `device` por `/dev/disk/by-id/`) e diskgroups; o 1º diskgroup é criado no gridSetup |
-| `ora_media.asmlib` | projeto (`media.yml`) | RPM `oracleasmlib` (file + sha256), baixado pelo DBA |
+| `ora_media.asmlib` | projeto (`media.yml`) | RPM `oracleasmlib` (file), baixado pelo DBA; a fase 30 confere a assinatura (`rpm -K`) |
 | `ora_media.cvu` | projeto (`media.yml`) | CVU avulso do MOS (patch 30839369): **não** usado na 19c em OL9 (sem dados de referência); mapeado para 26ai |
 | `ora_home_version` | inventário (`group_vars/oracle`) | `<major>.<ru>.0.0` tirado do `ora_ru`; nome dos homes |
 | `ora_grid_home` | inventário (`group_vars/oracle`) | `{{ ora_base }}/product/<major>.<ru>.0.0/grid`, ex.: `19.32.0.0` (OFA, standalone, dono único; nomenclatura da casa) |

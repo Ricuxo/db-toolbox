@@ -5,8 +5,9 @@
 - name: Stage | Patches a extrair
   ansible.builtin.set_fact:
     _stage_patches: >-
-      {{ (([ora_media.ru_grid] if ora_install_type == 'restart_asm' else [])
-          + [ora_media.ru_db] + (ora_media.oneoffs | default([])))
+      {{ (([ora_media.ru_grid] if ora_install_type in ['restart_asm', 'rac_asm'] else [])
+          + ([ora_media.ru_db] if ora_install_type != 'rac_asm' else [])
+          + (ora_media.oneoffs | default([])))
          | unique(attribute='patchid') }}
 
 - name: Stage | Diretórios de extração

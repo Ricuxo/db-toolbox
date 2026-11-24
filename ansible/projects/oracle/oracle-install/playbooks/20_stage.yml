@@ -2,7 +2,7 @@
 # Fase 20 — recolhe a mídia para o stage (se ora_stage_collect_from), verifica e descompacta
 # RU e one-offs no layout do stage (precisa do dono e do stage criados na fase 10).
 - name: Extração dos patches no stage
-  hosts: "{{ ora_hosts | default('oracle:!oracle_rac') }}"   # rac_asm: fase ainda não implementada
+  hosts: "{{ ora_hosts | default('oracle') }}"
   gather_facts: false
   any_errors_fatal: true
   pre_tasks:
@@ -10,6 +10,21 @@
       ansible.builtin.import_role:
         name: ora_env
       tags: [always]                # roda mesmo com --tags/--skip-tags
+      vars:
+        ora_env_phase_types: [restart_asm, si_fs, rac_asm]
+
+    # RAC: a mídia fica só no nó de instalação (1º do grupo oracle_rac); o gridSetup e o runInstaller
+    # copiam os homes para os outros nós.
+    - name: RAC | Nó que não é o de instalação
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: stage só no nó de instalação ({{ groups['oracle_rac'][0] }}). Nada a fazer aqui."
+      when: ora_install_type == 'rac_asm' and inventory_hostname != groups['oracle_rac'][0]
+      tags: [always]
+
+    - name: RAC | Encerrar este host
+      ansible.builtin.meta: end_host
+      when: ora_install_type == 'rac_asm' and inventory_hostname != groups['oracle_rac'][0]
+      tags: [always]
   tasks:
     - name: Recolher mídia para o stage
       ansible.builtin.include_role:

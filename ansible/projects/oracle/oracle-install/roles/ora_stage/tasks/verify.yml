@@ -38,30 +38,26 @@
       - "Confira se pertencem a esta instalação; se não, retire do stage. Nada foi alterado."
   when: _stage_extras | length > 0
 
-- name: Stage | Calcular sha256 da mídia (pode levar alguns minutos)
+- name: Stage | Mídia do catálogo no stage
   ansible.builtin.stat:
     path: "{{ ora_stage_dir }}/{{ item.file }}"
-    get_checksum: true
-    checksum_algorithm: sha256
+    get_checksum: false
   loop: "{{ _stage_items }}"
   loop_control:
     label: "{{ item.file }}"
   register: _stage_stat
 
-- name: Stage | Arquivo presente e íntegro
+- name: Stage | Arquivo presente
   ansible.builtin.assert:
-    that: item.1 == item.0.sha256 | lower
-    fail_msg: >-
-      {{ item.0.file }}:
-      {{ 'AUSENTE no stage (ou não é arquivo)' if not item.1 else
-         'sha256 DIVERGE (esperado ' ~ item.0.sha256 ~ ', encontrado ' ~ item.1 ~ ')' }}
+    that: item.1 | bool
+    fail_msg: "{{ item.0.file }}: AUSENTE no stage (ou não é arquivo)"
     success_msg: "{{ item.0.file }}: ok"
-  # Só o nome e o checksum: com o resultado do stat no laço, cada falha imprimia o stat inteiro.
-  loop: "{{ _stage_items | zip(_stage_stat.results | map(attribute='stat.checksum', default='')) | list }}"
+  # Só o nome e o resultado: com o resultado do stat no laço, cada falha imprimia o stat inteiro.
+  loop: "{{ _stage_items | zip(_stage_stat.results | map(attribute='stat.isreg', default=false)) | list }}"
   loop_control:
     label: "{{ item.0.file }}"
-  # Em --check o recolhimento (collect.yml) não move: o arquivo que ele moveria já teve o sha256
-  # conferido na origem e ainda não está no stage.
+  # Em --check o recolhimento (collect.yml) não move: o arquivo que ele moveria já foi achado na
+  # origem e ainda não está no stage.
   when: >-
     not (ansible_check_mode and item.0.file in (_collect_found | default([])
          | selectattr('status', 'equalto', 'mover') | map(attribute='file') | list))

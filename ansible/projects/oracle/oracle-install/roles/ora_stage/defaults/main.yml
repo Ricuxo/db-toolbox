@@ -1,6 +1,6 @@
 ---
 
 # Diretórios do servidor de onde a fase 20 pode recolher (mover) a mídia do catálogo para o
-# stage. Vazio = não move nada. Só move arquivo do ora_media que falte no stage, com sha256 igual
-# ao catálogo e no mesmo filesystem do stage.
+# stage. Vazio = não move nada. Só move arquivo do ora_media (pelo nome) que falte no stage e esteja
+# no mesmo filesystem do stage.
 ora_stage_collect_from: []

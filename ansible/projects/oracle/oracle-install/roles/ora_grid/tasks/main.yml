@@ -202,8 +202,8 @@
     patterns: "cvuqdisk-*.rpm"
   register: _grid_cvuqdisk
 
-# O cvuqdisk da Oracle não é assinado ("Signature: (none)"); a integridade vem da mídia e da RU,
-# verificadas pelo sha256 do MOS na fase 20. Aqui só se exige que os digests internos batam.
+# O cvuqdisk da Oracle não é assinado ("Signature: (none)"). Aqui só se exige que os digests internos
+# do RPM batam.
 - name: Grid | Integridade do cvuqdisk (rpm -K)
   ansible.builtin.command: rpm -K {{ _grid_cvuqdisk.files[0].path }}
   register: _grid_cvuqdisk_sig

@@ -67,20 +67,20 @@
 
 - name: ASMLib | oracleasmlib no catálogo
   ansible.builtin.assert:
-    that: ora_media.asmlib.file | default('') | length > 0 and ora_media.asmlib.sha256 | default('') | length > 0
-    fail_msg: "ora_media.asmlib (file + sha256) é obrigatório para a fase 30."
+    that: ora_media.asmlib.file | default('') | length > 0
+    fail_msg: "ora_media.asmlib (file) é obrigatório para a fase 30."
     quiet: true
 
-- name: ASMLib | sha256 do oracleasmlib
+- name: ASMLib | oracleasmlib no stage
   ansible.builtin.stat:
     path: "{{ ora_stage_dir }}/{{ ora_media.asmlib.file }}"
-    checksum_algorithm: sha256
+    get_checksum: false
   register: _al_rpm
 
-- name: ASMLib | oracleasmlib íntegro
+- name: ASMLib | oracleasmlib presente
   ansible.builtin.assert:
-    that: _al_rpm.stat.checksum | default('') == ora_media.asmlib.sha256 | lower
-    fail_msg: "{{ ora_media.asmlib.file }}: ausente no stage ou sha256 diferente do catálogo."
+    that: _al_rpm.stat.isreg | default(false)
+    fail_msg: "{{ ora_media.asmlib.file }}: ausente no stage."
     quiet: true
 
 - name: ASMLib | Assinatura do oracleasmlib (rpm -K)

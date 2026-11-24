@@ -1,15 +1,15 @@
 ---
 argument_specs:
   verify:
-    short_description: Confere se a mídia do catálogo está no stage com o sha256 certo (só leitura).
+    short_description: Confere se a mídia do catálogo está no stage, pelo nome do arquivo (só leitura).
     options:
       ora_stage_dir: {type: path, required: true}
       ora_media:
         type: dict
         required: true
         description:
-          - Catálogo da mídia. Cada item tem file e sha256 (do MOS); ru_grid e ru_db têm patchid.
-          - Chaves obrigatórias por cenário - restart_asm grid_base, db_base, opatch, ru_grid, ru_db; si_fs db_base, opatch, ru_db. oneoffs é lista opcional.
+          - Catálogo da mídia. Cada item tem file; ru_grid, ru_db e os one-offs têm patchid.
+          - Chaves obrigatórias por cenário - restart_asm grid_base, db_base, opatch, ru_grid, ru_db; si_fs db_base, opatch, ru_db; rac_asm grid_base, db_base, opatch, ru_grid. oneoffs é lista opcional.
   collect:
     short_description: Move para o stage a mídia do catálogo deixada em outro diretório do servidor.
     options:
@@ -20,8 +20,8 @@ argument_specs:
         elements: path
         required: true
         description:
-          - Diretórios de origem. Só move item do catálogo ausente no stage, com sha256 igual ao
-            ora_media e no mesmo filesystem do stage. Nunca sobrescreve nem apaga.
+          - Diretórios de origem. Só move item do catálogo (pelo nome) ausente no stage e no mesmo
+            filesystem do stage. Nunca sobrescreve nem apaga.
       ora_owner: {type: str, required: true}
       ora_install_group: {type: str, required: true}
   extract:

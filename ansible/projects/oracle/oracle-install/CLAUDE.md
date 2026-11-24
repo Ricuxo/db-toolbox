@@ -20,8 +20,8 @@ pergunte.
 - **Sem bypass.** Nunca `-ignorePrereq`, `-ignorePrereqFailure`, `CV_ASSUME_DISTID` ou
   equivalentes. Nunca reduza limite nem aceite item como exceção. Requisito não atendido se
   corrige no servidor.
-- **Mídia só com sha256 do MOS/edelivery.** Nunca use como referência o hash calculado do
-  próprio arquivo.
+- **Mídia pelo nome do arquivo.** O catálogo (`ora_media`) identifica cada item só pelo nome, sem
+  checksum, como a oravirt. Não reintroduza sha256 sem pedido do DBA.
 - **Discos só por `/dev/disk/by-id/`.** Nunca `/dev/sdX`: os nomes mudam entre boots. Só
   particione ou marque disco vazio.
 - **Senhas só do vault.** Nunca em claro, em `-e` ou em log. Tasks com senha usam

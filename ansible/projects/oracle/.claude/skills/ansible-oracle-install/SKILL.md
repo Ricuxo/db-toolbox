@@ -15,11 +15,11 @@ description: >-
 # Pré-voo do oracle-install
 
 Os playbooks do `oracle-install` **executam e se defendem**. A fase 00 aborta com Oracle ou outro
-SGBD no servidor, a 20 confere o sha256 e avisa sobre itens fora do catálogo, e as fases 30 a 70
+SGBD no servidor, a 20 confere a presença da mídia pelo nome e avisa sobre itens fora do catálogo, e as fases 30 a 70
 recusam estado parcial. Esta skill é a **camada de julgamento em volta deles**: revisa o que o DBA
 declarou, descobre onde o servidor está, aponta a próxima fase e explica falhas.
 
-**Não repita checagens que os playbooks já fazem.** Para o sha256 da mídia, mande rodar a fase 20 em
+**Não repita checagens que os playbooks já fazem.** Para a presença da mídia, mande rodar a fase 20 em
 `--check`. Para saber se o servidor está limpo, mande rodar a fase 00 em `--check`. A skill
 acrescenta o que o YAML não sabe: se o catálogo bate com a doc oficial, se o inventário afrouxa
 alguma regra, e em que ponto do fluxo o servidor está.
@@ -32,7 +32,7 @@ alguma regra, e em que ponto do fluxo o servidor está.
 - **Sem bypass.** Nunca proponha `-ignorePrereq`, `-ignorePrereqFailure`, `CV_ASSUME_DISTID`, aviso
   em `accept_warnings`, limite reduzido ou instalação sem a RU como saída. Requisito não atendido se
   corrige no servidor.
-- **sha256 só do MOS/edelivery.** Nunca sugira como referência o hash calculado do próprio arquivo.
+- **Mídia pelo nome do arquivo.** O catálogo não tem checksum (decisão do DBA, como a oravirt). Não sugira sha256.
 - **Discos só por `/dev/disk/by-id/`.**
 - **Senhas só no vault.** Nunca em claro, em `-e` ou em log.
 - **Leitura e `--check` são livres. Mudança no servidor ou no inventário só com aprovação.** A
@@ -66,8 +66,8 @@ Marque cada item como `[ok]`, `[FALTA]`, `[ATENÇÃO]` ou `[RISCO]`.
   (ex.: o guia 19c exige RU ≥ 19.32 para OL9 com UEK 8). Sem a página lida: NÃO VERIFICADO.
 
 **Catálogo `ora_media`**
-- Chaves obrigatórias: `grid_base`, `db_base`, `opatch`, `ru_grid`, `ru_db`. Cada item com `file` e
-  `sha256` de 64 hex. `patchid` nos RUs e em cada one-off. `asmlib` é obrigatório para a fase 30.
+- Chaves obrigatórias: `grid_base`, `db_base`, `opatch`, `ru_grid`, `ru_db`. Cada item com `file`.
+  `patchid` nos RUs e em cada one-off. `asmlib` é obrigatório para a fase 30.
 - **One-offs exigidos pela RU:** leia a página oficial "Installing Oracle Database 19c (19.xx) on
   Oracle Linux 9 and RHEL 9" da RU alvo e compare com `ora_media.oneoffs`. Um one-off exigido que
   falta vira `[FALTA]`. Um one-off que está no catálogo e não aparece na página vira `[ATENÇÃO]`,
@@ -131,12 +131,11 @@ O catálogo são as entradas **não comentadas** de `ora_media` com `file` (as c
   (`p<patchid>_<versão>_<plataforma>.zip`). Se puder, confirme o patch pelo README de dentro do ZIP
   (`unzip -l`/`unzip -p`, só leitura). Sugira a entrada para o DBA revisar e colar:
   ```yaml
-  - {file: p<patchid>_<versão>_Linux-x86-64.zip, patchid: "<patchid>", sha256: <copiar do MOS>}  # <descrição do MOS>
+  - {file: p<patchid>_<versão>_Linux-x86-64.zip, patchid: "<patchid>"}  # <descrição do MOS>
   ```
   Diga se ele é exigido pela página da RU (então vai em `oneoffs`) ou se fica fora do fluxo de
-  instalação, como a OJVM, que depende de decisão do DBA. Nunca preencha o sha256 com o hash
-  calculado do arquivo.
-- A integridade (sha256) é da fase 20: recomende `20_stage.yml --check`.
+  instalação, como a OJVM, que depende de decisão do DBA.
+- A presença da mídia é da fase 20: recomende `20_stage.yml --check`.
 
 ## Passo 4 — próxima fase, com o comando pronto
 
@@ -152,7 +151,7 @@ cd /projetos/DESENVOLVIMENTO/desenvolvimento/db-toolbox/ansible/projects/oracle/
 | 00 | `00_gate.yml --check` | Só leitura |
 | 10 | `10_host_prep.yml --check --diff`, depois a execução real | O GRUB (THP `madvise`) só vale no próximo boot: reiniciar em janela |
 | Depois da 10 | `oracle-install-os`, **confirmação** | Obrigatória antes do software |
-| 20 | DBA copia a mídia para o stage, depois `20_stage.yml` | sha256 do MOS no `ora_media` |
+| 20 | DBA copia a mídia para o stage, depois `20_stage.yml` | nome do arquivo igual ao do `ora_media` |
 | 30 | `30_asmlib.yml` | Só disco vazio por by-id |
 | 40 | `40_grid.yml --ask-vault-pass` | Pede o vault **até em `--check`** (o arg spec renderiza as senhas); cerca de 15 a 30 min |
 | 50 | `50_db_software.yml` | Cerca de 15 min |
@@ -213,7 +212,7 @@ Para essas situações, não sugira roles da oravirt nem adapte as fases de inst
 
 - Editar o inventário, as roles ou o vault sem um "sim" explícito do DBA.
 - Rodar `ansible-playbook` sem `--check` sem aprovação.
-- Baixar ou copiar mídia, ou calcular sha256 como referência.
+- Baixar ou copiar mídia.
 - Gravar arquivo no servidor, nem temporário (script SQL em `/tmp`, por exemplo). A coleta é por comando e pipe.
 - Propor bypass, aviso aceito ou limite reduzido.
 - Decifrar o vault, mostrar senha ou passar senha por `-e`.
