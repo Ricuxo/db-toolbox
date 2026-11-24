@@ -177,8 +177,12 @@ coisa. Se o achado for novo e confirmado, sugira acrescentá-lo ao arquivo.
 - Patch ou RU num ambiente já instalado (o antigo "Fluxo B"). O caminho é um projeto próprio,
   ainda inexistente.
 - Segundo Oracle home ao lado de banco existente: projeto separado, por decisão do DBA.
-- RAC além das fases prontas: o cenário `rac_asm` (grupo `oracle_rac`) está em construção, com as
-  fases 00, 10 e 15 prontas e as demais recusando o cenário (desenho em `oracle-install/DESENHO-RAC.md`).
+- RAC além das fases prontas: o cenário `rac_asm` (grupo `oracle_rac`) está em construção. Prontas
+  para `rac_asm`: 00, 10, 15, 20 e 40. Ainda não implementadas: 50, 60, 65 e 70 — o `hosts` padrão
+  dessas fases exclui `oracle_rac` e as roles não têm ramo RAC; ao passá-las com
+  `-e ora_hosts=<cluster RAC>`, o `ora_hosts` sobrepõe o padrão e a fase aborta (ex.: a 50 afirma
+  `olr.loc` ausente, que após a 40 passa a existir). Não se aplicam ao RAC: 30 (ASMLib — disco por
+  udev na 15), 55 e 62 (`si_fs`). Desenho em `oracle-install/DESENHO-RAC.md`.
 - Banco em filesystem sem ASM, versões além da 19c, separação de papéis (usuário `grid`).
 
 Para essas situações, não sugira roles da oravirt nem adapte as fases de instalação.
