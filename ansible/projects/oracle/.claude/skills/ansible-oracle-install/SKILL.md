@@ -1,5 +1,5 @@
 ---
-name: oracle-ansible-preflight
+name: ansible-oracle-install
 description: >-
   Pré-voo e orientação do projeto Ansible oracle-install (roles próprias, variáveis ora_; 19c,
   Oracle Restart, ASM com ASMLib v3, Oracle Linux 9, servidor novo). Revisa o inventário antes de
