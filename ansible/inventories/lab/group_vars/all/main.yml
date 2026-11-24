@@ -1,6 +1,0 @@
----
-# Só o que vale para TODO servidor deste ambiente, de qualquer tecnologia.
-
-# Nome do ambiente. Os playbooks mostram este valor e recusam rodar sem ele. Os que param ou
-# alteram banco existente exigem -e ora_confirm_env=<ambiente> quando ele for prod.
-ora_env: lab

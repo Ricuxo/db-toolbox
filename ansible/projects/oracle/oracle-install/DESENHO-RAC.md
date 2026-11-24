@@ -1,7 +1,7 @@
 # Desenho: cenário `rac_asm` (RAC 19c, 2 nós, ASM por udev)
 
 Estado: **em construção**. Prontas e testadas no lab: fases 00, 10 e 15. As demais ainda recusam o `rac_asm`.
-Alvo inicial: `orclrac1` (192.168.15.170) e `orclrac2` (192.168.15.171), lab.
+Exemplos com os nomes do inventário modelo (`inventories/example`, cluster `rac_cluster01`); valores fictícios.
 
 ## 1. O que o cenário instala
 
@@ -13,13 +13,13 @@ RU **19.30** (GIRU 38629535) nos dois homes, mais o one-off **38609069**. Dono �
 | 00 gate | igual (sem mudança) | os dois nós |
 | 10 host_prep | igual, mais os ramos novos (seção 4) | os dois nós |
 | 15 rac_prep (nova) | regra udev por WWN e SSH equivalence do `oracle` | os dois nós |
-| 20 stage | igual, só no nó de instalação | `orclrac1` |
+| 20 stage | igual, só no nó de instalação | `srvrac01` |
 | 30 asmlib | **não entra** (a regra udev da 15 substitui) | — |
-| 40 grid | ramo `CRS_CONFIG` | instalador em `orclrac1`; `root.sh` em série, `orclrac1` e depois `orclrac2` |
-| 45 diskgroups (nova ou ramo da 40) | `+FRA` e `+DATA` com `asmca -silent` | `orclrac1` |
-| 50 db_software | ramo RAC (`-applyRU <GIRU>`, `CLUSTER_NODES`) | instalador em `orclrac1`; `root.sh` em série |
-| 60 dbca | ramo RAC (`databaseConfigType=RAC`, `nodelist`) | `orclrac1` |
-| 65 db_service | `srvctl add service -preferred <inst1>,<inst2>` | `orclrac1` |
+| 40 grid | ramo `CRS_CONFIG` | instalador em `srvrac01`; `root.sh` em série, `srvrac01` e depois `srvrac02` |
+| 45 diskgroups (nova ou ramo da 40) | `+FRA` e `+DATA` com `asmca -silent` | `srvrac01` |
+| 50 db_software | ramo RAC (`-applyRU <GIRU>`, `CLUSTER_NODES`) | instalador em `srvrac01`; `root.sh` em série |
+| 60 dbca | ramo RAC (`databaseConfigType=RAC`, `nodelist`) | `srvrac01` |
+| 65 db_service | `srvctl add service -preferred <inst1>,<inst2>` | `srvrac01` |
 | 70 hugepages | por nó, um de cada vez (reinicia uma instância por vez) | os dois nós, em série |
 
 O "nó de instalação" é o primeiro de `ora_rac_nodes` (variável do cluster), e as fases o recusam
@@ -31,15 +31,15 @@ se a mídia não estiver nele.
 # hosts.yml, dentro de oracle.children
         oracle_rac:                        # RAC: um subgrupo por cluster
           children:
-            rac_orclrac:
+            rac_cluster01:
               hosts:
-                orclrac1:
-                  ansible_host: 192.168.15.170
-                orclrac2:
-                  ansible_host: 192.168.15.171
+                srvrac01:
+                  ansible_host: 10.0.0.31
+                srvrac02:
+                  ansible_host: 10.0.0.32
 ```
 
-`group_vars/rac_orclrac/main.yml` (valores do cluster, iguais para os dois nós; cada cluster é um subgrupo de `oracle_rac`, e o `group_vars/oracle_rac/` só tem o cenário e o Grid home):
+`group_vars/rac_cluster01/main.yml` (valores do cluster, iguais para os dois nós; cada cluster é um subgrupo de `oracle_rac`, e o `group_vars/oracle_rac/` só tem o cenário e o Grid home):
 
 ```yaml
 ora_install_type: rac_asm
@@ -49,24 +49,24 @@ ora_install_type: rac_asm
 # O nome <major>.<ru>.0.0 (ora_home_version) vem de group_vars/oracle; aqui o Grid home só sai do ORACLE_BASE.
 ora_grid_home: "{{ ora_app_dir }}/{{ ora_home_version }}/grid"      # /u01/app/19.30.0.0/grid
 
-ora_rac_cluster_name: orclrac
-ora_rac_scan_name: orclrac-scan.oracle.local
+ora_rac_cluster_name: cluster01
+ora_rac_scan_name: cluster01-scan.example.com
 ora_rac_scan_port: 1521
 ora_rac_nodes:                             # gridsetup.rsp: clusterNodes = <público>:<vip>
-  - {name: orclrac1, vip: orclrac1-vip}
-  - {name: orclrac2, vip: orclrac2-vip}
+  - {name: srvrac01, vip: srvrac01-vip}
+  - {name: srvrac02, vip: srvrac02-vip}
 ora_rac_interfaces:                        # gridsetup.rsp: networkInterfaceList, tipo 1=PUBLIC, 5=ASM & PRIVATE
-  - {name: eth0, subnet: 192.168.15.0, type: 1}
+  - {name: eth0, subnet: 10.0.0.0, type: 1}
   - {name: eth1, subnet: 10.10.10.0,   type: 5}
 
 # Discos por WWN (by-id). A regra udev da fase 15 dá dono, grupo e modo.
 ora_asm:
   disks:
-    - {label: OCR1,  device: /dev/disk/by-id/wwn-0x600140519b9a8a6ed59415fa8f90e2de}
-    - {label: OCR2,  device: /dev/disk/by-id/wwn-0x60014052ac969a71c904789b6e3dd3f3}
-    - {label: OCR3,  device: /dev/disk/by-id/wwn-0x6001405b4a3c5d193b744e09b691c978}
-    - {label: DATA1, device: /dev/disk/by-id/wwn-0x600140520498f4576174113b847672ce}
-    - {label: FRA1,  device: /dev/disk/by-id/wwn-0x6001405c474ebfd1f0242cea8a15ceeb}
+    - {label: OCR1,  device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b001}
+    - {label: OCR2,  device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b002}
+    - {label: OCR3,  device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b003}
+    - {label: DATA1, device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b004}
+    - {label: FRA1,  device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b005}
   diskgroups:                              # o 1º é o do OCR/voting, criado no gridSetup
     - {name: OCR,  redundancy: EXTERNAL, disks: [OCR1, OCR2, OCR3]}
     - {name: DATA, redundancy: EXTERNAL, disks: [DATA1]}
@@ -98,7 +98,7 @@ ora_media:
 - A mídia é identificada só pelo nome do arquivo, sem checksum (decisão do DBA, como a oravirt).
 
 **Onde fica o catálogo:** `playbooks/group_vars/all/media.yml` tem um catálogo por RU (`ora_media_catalog`);
-o cluster escolhe a RU com `ora_ru` no `group_vars/<cluster>/main.yml` (no lab, `rac_orclrac`: 19.30), e o
+o cluster escolhe a RU com `ora_ru` no `group_vars/<cluster>/main.yml` (ex.: 19.30), e o
 `ora_media` é o catálogo dessa RU.
 
 ## 4. Mudanças nas fases existentes
@@ -133,21 +133,21 @@ o cluster escolhe a RU com `ora_ru` no `group_vars/<cluster>/main.yml` (no lab, 
 da mídia 19.3:
 - `oracle.install.option=CRS_CONFIG`, `ClusterConfiguration=STANDALONE`, `scanType=LOCAL_SCAN`;
 - `gpnp.scanName`, `gpnp.scanPort`, `clusterName`;
-- `clusterNodes=orclrac1:orclrac1-vip,orclrac2:orclrac2-vip` e `networkInterfaceList=eth0:192.168.15.0:1,eth1:10.10.10.0:5`;
+- `clusterNodes=srvrac01:srvrac01-vip,srvrac02:srvrac02-vip` e `networkInterfaceList=eth0:10.0.0.0:1,eth1:10.10.10.0:5`;
 - `storageOption=FLEX_ASM_STORAGE`;
 - `configureGIMR=false` (sem GIMR, decisão 5);
 - `diskGroup.disks` com o caminho by-id (sem o prefixo `ORCL:` do ASMLib) e
   `diskDiscoveryString` com os caminhos by-id exatos de `ora_asm` (decisão 2);
-- `executeRootScript=false`: o `root.sh` roda pelo Ansible, `orclrac1` e depois `orclrac2`;
-- `-executeConfigTools` no fim, só no `orclrac1`.
+- `executeRootScript=false`: o `root.sh` roda pelo Ansible, `srvrac01` e depois `srvrac02`;
+- `-executeConfigTools` no fim, só no `srvrac01`.
 
 Os campos do template são todos documentados nos comentários dele. A ordem do `root.sh` (primeiro nó
 antes dos demais, em série) fica **NÃO VERIFICADO** na doc lida até agora.
 
-**50 db_software:** `oracle.install.option=INSTALL_DB_SWONLY` com `CLUSTER_NODES=orclrac1,orclrac2`. As
+**50 db_software:** `oracle.install.option=INSTALL_DB_SWONLY` com `CLUSTER_NODES=srvrac01,srvrac02`. As
 chaves vêm do template `db_install.rsp`, a ler antes do código. Depois, `root.sh` em série.
 
-**60 dbca:** `databaseConfigType=RAC` e `nodelist=orclrac1,orclrac2`, com datafiles em `+DATA` e a
+**60 dbca:** `databaseConfigType=RAC` e `nodelist=srvrac01,srvrac02`, com datafiles em `+DATA` e a
 FRA em `+FRA`. As chaves vêm do template `dbca.rsp`, a ler antes do código.
 
 **65 e 70:** os serviços com as duas instâncias preferidas. As HugePages são calculadas por nó, e o
@@ -159,9 +159,9 @@ reinício é de uma instância por vez, com `srvctl stop/start instance`.
 2. **Disk string:** os caminhos by-id exatos dos discos de `ora_asm` (lista separada por vírgula, sem glob).
    A fase 15 não cria links `/dev/oracleasm/*`.
 3. **THP no RHCK:** `never`, só conferido pela fase 10.
-4. **Patches no stage:** recolhidos pela fase 20 via `ora_stage_collect_from` (host_vars do `orclrac1`);
+4. **Patches no stage:** recolhidos pela fase 20 via `ora_stage_collect_from` (host_vars do `srvrac01`);
    tirar a entrada depois da fase 20.
-5. **GIMR:** não configurar. O LUN `lun-gimr` fica fora do `ora_asm` e da regra udev.
+5. **GIMR:** não configurar. O LUN do GIMR fica fora do `ora_asm` e da regra udev.
 
 ## 6. Pendências antes da fase 40 (MOS)
 
@@ -170,7 +170,7 @@ reinício é de uma instância por vez, com `srvctl stop/start instance`.
   A falta de página da 19.30 não prova que a 19.30 está livre do bug. Procure no MOS se há
   variante `_1930000…`.
 - Certificação do OL 9.9 com RHCK 5.14.0-741 para o 19c.
-- OPatch 12.2.0.1.56 e a GIRU baixada de novo no stage do `orclrac1`.
+- OPatch 12.2.0.1.56 e a GIRU baixada de novo no stage do `srvrac01`.
 - Ler os templates `db_install.rsp` e `dbca.rsp` da mídia e a página do cwlin sobre o `root.sh` em cluster.
 
 ## 7. Documentação

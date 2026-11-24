@@ -16,6 +16,11 @@ ansible/
 
 Cada projeto tem o próprio `README.md` com escopo, fases e variáveis.
 
+**Inventários reais não entram no repositório.** Só o `inventories/example/` é versionado (veja o
+`inventories/.gitignore`). O inventário de cada ambiente ou cliente tem IPs, nomes, discos e senhas
+(vault) e fica na máquina de quem opera, ou num repositório privado. Para começar, copie o modelo:
+`cp -r inventories/example inventories/<amb>` e siga o `inventories/example/README.md`.
+
 ## Nome das skills de projeto
 
 Skill que existe para operar **um projeto deste diretório** se chama

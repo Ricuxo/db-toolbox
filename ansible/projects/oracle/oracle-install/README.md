@@ -69,7 +69,8 @@ ansible-playbook -i ../../../inventories/lab playbooks/10_host_prep.yml
 ```
 
 **Inventário e ambiente.** O inventário é compartilhado por todos os projetos e fica fora deste,
-em `db-toolbox/ansible/inventories/<amb>/` (daqui: `../../../inventories/<amb>`). Cada ambiente
+em `db-toolbox/ansible/inventories/<amb>/` (daqui: `../../../inventories/<amb>`). Só o modelo
+`inventories/example/` é versionado; os inventários reais ficam fora do git. Cada ambiente
 (`lab`, `dev`, `hml`, `prod`) tem o seu diretório, e **o ambiente é o `-i` do comando**: com
 `-i .../inventories/dev`, os servidores de produção não existem para o Ansible. Não há inventário
 padrão no `ansible.cfg`, de propósito: sem `-i`, nenhum host casa e nada roda.
