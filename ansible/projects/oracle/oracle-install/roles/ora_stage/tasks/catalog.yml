@@ -5,6 +5,14 @@
 # O que cada cenário instala (rnrdm 19.32 OL9): Grid + banco em restart_asm (GIRU nos dois homes,
 # ASMLib); só o banco em si_fs (DB RU, sem Grid nem ASMLib); Grid + banco RAC em rac_asm (GIRU nos
 # dois homes, como no comando "Oracle RAC" da página da 19.32; discos por udev, sem ASMLib).
+- name: Stage | RU com catálogo
+  ansible.builtin.assert:
+    that: ora_ru in ora_media_catalog
+    fail_msg: >-
+      ora_ru {{ ora_ru }} não está em ora_media_catalog ({{ ora_media_catalog | list }}).
+      Escolha uma RU do catálogo no inventário ou acrescente a entrada em playbooks/group_vars/all/media.yml.
+    quiet: true
+
 - name: Stage | Chaves da mídia deste cenário
   ansible.builtin.set_fact:
     _stage_keys: >-

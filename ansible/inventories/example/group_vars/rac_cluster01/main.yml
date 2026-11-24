@@ -1,6 +1,10 @@
 ---
 # Cluster RAC rac_cluster01. Tudo aqui vale para os nós deste cluster (e só para eles).
 
+# RU da instalação: uma das entradas de ora_media_catalog (oracle-install/playbooks/group_vars/all/
+# media.yml). Sem esta linha vale o padrão do projeto.
+# ora_ru: 19.30.0.0
+
 # Cluster (chaves do template oficial install/response/gridsetup.rsp da mídia 19.3).
 ora_rac_cluster_name: cluster01            # até 63 caracteres: letras, números e hífen (gridsetup.rsp)
 ora_rac_scan_name: cluster01-scan.example.com   # no DNS, com 3 IPs

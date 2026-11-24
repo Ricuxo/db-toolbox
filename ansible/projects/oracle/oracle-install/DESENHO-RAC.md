@@ -97,13 +97,9 @@ ora_media:
 - Não há `asmlib`. As chaves obrigatórias da fase 20 passam a depender do cenário.
 - A mídia é identificada só pelo nome do arquivo, sem checksum (decisão do DBA, como a oravirt).
 
-**Onde fica o catálogo (decisão do DBA):**
-- (a) `playbooks/group_vars/oracle_rac/media.yml` no projeto. Mantém a regra do README de que RU e
-  catálogo são da instalação. O group_vars de playbook vence o do inventário e o `all`.
-- (b) `inventories/lab/group_vars/oracle_rac/media.yml`. Também vence o `playbooks/group_vars/all/media.yml`,
-  mas mistura a mídia com o inventário compartilhado.
-
-Recomendo a (a).
+**Onde fica o catálogo:** `playbooks/group_vars/all/media.yml` tem um catálogo por RU (`ora_media_catalog`);
+o cluster escolhe a RU com `ora_ru` no `group_vars/<cluster>/main.yml` (no lab, `rac_orclrac`: 19.30), e o
+`ora_media` é o catálogo dessa RU.
 
 ## 4. Mudanças nas fases existentes
 
@@ -159,7 +155,7 @@ reinício é de uma instância por vez, com `srvctl stop/start instance`.
 
 ## 5. Decisões do DBA (2026-11-24)
 
-1. **Catálogo da 19.30:** `playbooks/group_vars/oracle_rac/media.yml`, no projeto (opção a).
+1. **Catálogo da 19.30:** entrada `19.30.0.0` do `ora_media_catalog` (projeto); a RU é escolhida no inventário, por cluster.
 2. **Disk string:** os caminhos by-id exatos dos discos de `ora_asm` (lista separada por vírgula, sem glob).
    A fase 15 não cria links `/dev/oracleasm/*`.
 3. **THP no RHCK:** `never`, só conferido pela fase 10.

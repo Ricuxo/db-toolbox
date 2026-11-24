@@ -1,4 +1,7 @@
 ---
+# RU da instalação (opcional): uma das entradas de ora_media_catalog; sem esta linha vale o padrão.
+# ora_ru: 19.32.0.0
+
 # Single Instance em filesystem, sem Grid. O disco dos datafiles tem de estar montado em /u02 antes da
 # fase 10 (ora_db_data_mount, em group_vars/oracle_si).
 

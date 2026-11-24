@@ -1,5 +1,10 @@
 ---
 # Cluster orclrac (lab): 2 nós, storage iSCSI, DNS local (dnsmasq no orclrac1).
+
+# RU da instalação (catálogo em oracle-install/playbooks/group_vars/all/media.yml). 19.30 exige RHCK:
+# o guia 19c só suporta UEK 8 a partir da 19.32.
+ora_ru: 19.30.0.0
+
 # Cluster (chaves do template oficial install/response/gridsetup.rsp da mídia 19.3).
 ora_rac_cluster_name: orclrac
 ora_rac_scan_name: orclrac-scan.oracle.local     # DNS local (dnsmasq no orclrac1), 3 IPs

@@ -7,7 +7,7 @@ Escopo atual: **19c · Oracle Linux 9 · dono único `oracle`**, em dois cenári
 |---|---|---|---|
 | `restart_asm` | `oracle_restart` | Oracle Restart (Grid standalone) + ASM (ASMLib v3); banco em ASM; GIRU nos dois homes | 00 10 20 30 40 50 60 65 70 |
 | `si_fs` | `oracle_si` | Só o banco (Single Instance, sem Grid) em filesystem; DB RU; listener do home; início no boot por `dbstart`/`dbora` | 00 10 20 50 55 60 62 65 70 |
-| `rac_asm` | `oracle_rac` | RAC: Grid Infrastructure for a Cluster + ASM com discos por regra udev (WWN), sem ASMLib; RU do próprio grupo (`playbooks/group_vars/oracle_rac/media.yml`). **Em construção** (desenho em `DESENHO-RAC.md`) | prontas: 00 10 15 |
+| `rac_asm` | `oracle_rac` | RAC: Grid Infrastructure for a Cluster + ASM com discos por regra udev (WWN), sem ASMLib; RU escolhida por cluster (`ora_ru` em `group_vars/<cluster>`). **Em construção** (desenho em `DESENHO-RAC.md`) | prontas: 00 10 15 20; 40 escrita |
 
 **O cenário vem do grupo do host no inventário** (`group_vars/<grupo>/main.yml` define
 `ora_install_type`), do mesmo jeito que o ambiente vem do `-i`. As fases comuns miram no grupo
@@ -143,8 +143,8 @@ servidores Oracle em `group_vars/oracle/main.yml`; o que é de um servidor só e
 | `ora_stage_collect_from` | host_vars | diretórios de onde a fase 20 pode mover a mídia para o stage (padrão `[]`) |
 | `ora_supported_os` | projeto (`playbooks/group_vars/all`) | escopo de SO aceito pelo gate |
 | `ora_version` | inventário (`group_vars/oracle`) | release base da mídia, 4 partes (`19.3.0.0`) |
-| `ora_ru` | projeto (`media.yml`) | RU alvo, aplicado na instalação (`19.32.0.0`) |
-| `ora_media` | projeto (`media.yml`) | catálogo da mídia: `file` (+ `patchid` nos RUs e one-offs); sem checksum |
+| `ora_ru` | padrão no projeto (`media.yml`, `19.32.0.0`); o inventário escolhe outra por servidor (`host_vars`) ou cluster (`group_vars/<cluster>`) | RU aplicada na instalação; tem de ser uma entrada de `ora_media_catalog` |
+| `ora_media_catalog` / `ora_media` | projeto (`media.yml`) | um catálogo por RU (`file`, + `patchid` nos RUs e one-offs; sem checksum); o `ora_media` é o da RU escolhida |
 | `ora_install_type` | inventário (`group_vars/oracle_restart` ou `oracle_si`) | cenário: `restart_asm` ou `si_fs` |
 | `ora_db_data_mount`, `ora_db_data_dir`, `ora_db_fra_dir` | inventário (`group_vars/oracle_si`) | `si_fs`: `/u02` (tem de ser ponto de montagem), `/u02/app/oracle/oradata`, `<ORACLE_BASE>/fast_recovery_area` (OFA) |
 | `ora_asm` | host_vars | discos (`label` + `device` por `/dev/disk/by-id/`) e diskgroups; o 1º diskgroup é criado no gridSetup |

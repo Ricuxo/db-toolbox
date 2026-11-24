@@ -1,4 +1,7 @@
 ---
+# RU da instalação (opcional): uma das entradas de ora_media_catalog; sem esta linha vale o padrão.
+# ora_ru: 19.32.0.0
+
 # Oracle Restart + ASM (ASMLib v3, fase 30). Discos sempre por /dev/disk/by-id/, nunca /dev/sdX.
 ora_asm:
   disks:
