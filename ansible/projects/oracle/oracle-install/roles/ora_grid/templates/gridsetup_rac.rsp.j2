@@ -1,0 +1,36 @@
+# Gerado pela role ora_grid (rac_asm). Contém senhas: 0600, dono {{ ora_owner }}, apagado ao fim.
+# Chaves do template oficial install/response/gridsetup.rsp (19.3), para "Grid Infrastructure for a
+# cluster" (oracle.install.option=CRS_CONFIG, ClusterConfiguration=STANDALONE).
+oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_schema_v19.0.0
+INVENTORY_LOCATION={{ ora_inventory_dir }}
+oracle.install.option=CRS_CONFIG
+ORACLE_BASE={{ ora_base }}
+oracle.install.asm.OSDBA={{ ora_grid_osdba }}
+oracle.install.asm.OSOPER={{ ora_grid_osoper }}
+oracle.install.asm.OSASM={{ ora_grid_osasm }}
+oracle.install.crs.config.scanType=LOCAL_SCAN
+oracle.install.crs.config.gpnp.scanName={{ ora_rac_scan_name }}
+oracle.install.crs.config.gpnp.scanPort={{ ora_rac_scan_port }}
+oracle.install.crs.config.ClusterConfiguration=STANDALONE
+oracle.install.crs.config.configureAsExtendedCluster=false
+oracle.install.crs.config.clusterName={{ ora_rac_cluster_name }}
+oracle.install.crs.config.gpnp.configureGNS=false
+oracle.install.crs.config.autoConfigureClusterNodeVIP=false
+oracle.install.crs.config.clusterNodes={{ ora_rac_nodes | map(attribute='name') | zip(ora_rac_nodes | map(attribute='vip')) | map('join', ':') | join(',') }}
+oracle.install.crs.config.networkInterfaceList={{ ora_rac_interfaces | map(attribute='name') | zip(ora_rac_interfaces | map(attribute='subnet'), ora_rac_interfaces | map(attribute='type') | map('string')) | map('join', ':') | join(',') }}
+oracle.install.crs.configureGIMR=false
+oracle.install.asm.configureGIMRDataDG=false
+oracle.install.crs.config.storageOption=FLEX_ASM_STORAGE
+oracle.install.crs.config.useIPMI=false
+oracle.install.asm.SYSASMPassword={{ vault_ora_sysasm_password | trim }}
+oracle.install.asm.diskGroup.name={{ _grid_dg.name }}
+oracle.install.asm.diskGroup.redundancy={{ _grid_dg.redundancy }}
+oracle.install.asm.diskGroup.AUSize={{ _grid_dg.au_size | default(1) }}
+oracle.install.asm.diskGroup.disks={{ _grid_dg_devices | join(',') }}
+oracle.install.asm.diskGroup.diskDiscoveryString={{ ora_asm.disks | map(attribute='device') | join(',') }}
+oracle.install.asm.monitorPassword={{ vault_ora_asmsnmp_password | trim }}
+oracle.install.asm.configureAFD=false
+oracle.install.crs.configureRHPS=false
+oracle.install.crs.config.ignoreDownNodes=false
+oracle.install.config.managementOption=NONE
+oracle.install.crs.rootconfig.executeRootScript=false

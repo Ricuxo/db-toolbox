@@ -1,8 +1,9 @@
 ---
-# Fase 40 — Grid Infrastructure for a Standalone Server (Oracle Restart). Precisa das fases 10–30
-# e de vault_ora_sysasm_password / vault_ora_asmsnmp_password (group_vars/all/vault.yml).
-- name: Oracle Grid Infrastructure (Restart)
-  hosts: "{{ ora_hosts | default('oracle_restart') }}"
+# Fase 40 — Grid Infrastructure: Oracle Restart (restart_asm, precisa das fases 10–30) ou cluster RAC
+# (rac_asm, precisa das fases 10, 15 e 20; todos os nós de uma vez). Precisa de
+# vault_ora_sysasm_password / vault_ora_asmsnmp_password (group_vars/all/vault.yml).
+- name: Oracle Grid Infrastructure
+  hosts: "{{ ora_hosts | default('oracle_restart:oracle_rac') }}"
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:
@@ -10,6 +11,8 @@
       ansible.builtin.import_role:
         name: ora_env
       tags: [always]                # roda mesmo com --tags/--skip-tags
+      vars:
+        ora_env_phase_types: [restart_asm, rac_asm]
   roles:
     - role: ora_grid
       tags: [grid]

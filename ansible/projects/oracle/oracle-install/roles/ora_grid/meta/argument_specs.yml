@@ -1,8 +1,10 @@
 ---
 argument_specs:
   main:
-    short_description: Instala o Oracle Grid Infrastructure for a Standalone Server (Oracle Restart).
+    short_description: Instala o Oracle Grid Infrastructure (Oracle Restart ou cluster RAC).
     description:
+      - restart_asm, Grid for a Standalone Server (HA_CONFIG); rac_asm, Grid for a Cluster (CRS_CONFIG, Standalone Cluster).
+      - No RAC, o instalador roda no 1º nó de ora_rac_nodes; orainstRoot.sh e root.sh em todos, um nó por vez.
       - gridSetup.sh silencioso com -applyRU/-applyOneOffs; nunca -ignorePrereq.
       - Aborta se não for servidor limpo: instalador rodando, olr.loc, .patch_storage no home ou inventário.
       - Apaga response files de execuções interrompidas (/tmp/ora_grid_*) antes de começar.
@@ -27,3 +29,8 @@ argument_specs:
       ora_grid_diskstring: {type: str}
       ora_grid_opatch_min: {type: str}
       ora_grid_accept_warnings: {type: list, elements: str}
+      ora_rac_cluster_name: {type: str}
+      ora_rac_scan_name: {type: str}
+      ora_rac_scan_port: {type: int}
+      ora_rac_nodes: {type: list, elements: dict}
+      ora_rac_interfaces: {type: list, elements: dict}

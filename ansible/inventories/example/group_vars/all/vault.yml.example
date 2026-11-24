@@ -1,0 +1,15 @@
+---
+# Senhas do ambiente. Cada VALOR é criptografado com ansible-vault encrypt_string (não o
+# arquivo inteiro): assim só os playbooks que usam a senha pedem --ask-vault-pass; as fases
+# sem senha (gate, preparação, stage, ASMLib) rodam sem ela. Testado em 2026-11-13.
+#
+# Gerar um valor (senha digitada às cegas, sem ir para o histórico nem ganhar quebra de linha):
+#   bash -c 'read -rs -p "Senha: " P && echo && printf "%s" "$P" | \
+#     ansible-vault encrypt_string --ask-vault-pass --stdin-name vault_ora_sysasm_password'
+# Colar a saída aqui, no lugar da linha correspondente. Mesma senha de vault para todos os valores.
+# (No ansible-core 2.20.7 do laboratório, o --prompt e o stdin com Ctrl+D falharam na prática.)
+vault_ora_sys_password: ""
+vault_ora_system_password: ""
+vault_ora_sysasm_password: ""     # SYSASM do ASM (fase 40, gridSetup)
+vault_ora_asmsnmp_password: ""    # ASMSNMP (fase 40, monitorPassword)
+vault_ora_pdbadmin_password: ""

@@ -13,17 +13,17 @@
       vars:
         ora_env_phase_types: [restart_asm, si_fs, rac_asm]
 
-    # RAC: a mídia fica só no nó de instalação (1º do grupo oracle_rac); o gridSetup e o runInstaller
+    # RAC: a mídia fica só no nó de instalação (o 1º de ora_rac_nodes); o gridSetup e o runInstaller
     # copiam os homes para os outros nós.
     - name: RAC | Nó que não é o de instalação
       ansible.builtin.debug:
-        msg: "{{ inventory_hostname }}: stage só no nó de instalação ({{ groups['oracle_rac'][0] }}). Nada a fazer aqui."
-      when: ora_install_type == 'rac_asm' and inventory_hostname != groups['oracle_rac'][0]
+        msg: "{{ inventory_hostname }}: stage só no nó de instalação ({{ ora_rac_nodes[0].name }}). Nada a fazer aqui."
+      when: ora_install_type == 'rac_asm' and inventory_hostname != ora_rac_nodes[0].name
       tags: [always]
 
     - name: RAC | Encerrar este host
       ansible.builtin.meta: end_host
-      when: ora_install_type == 'rac_asm' and inventory_hostname != groups['oracle_rac'][0]
+      when: ora_install_type == 'rac_asm' and inventory_hostname != ora_rac_nodes[0].name
       tags: [always]
   tasks:
     - name: Recolher mídia para o stage

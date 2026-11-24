@@ -109,6 +109,21 @@ time ansible-playbook -i ../../../inventories/lab playbooks/site.yml --ask-vault
   A mídia é só a do banco: `db_base`, OPatch, DB RU e os one-offs. O disco dos datafiles tem de estar
   montado em `/u02` antes da fase 10. Um reboot depois da instalação prova o `dbora`.
 
+## Incluir um servidor
+
+O modelo está em `ansible/inventories/example/` (um servidor de cada cenário, valores fictícios, com
+`README.md`). Copie para `inventories/<amb>/` e preencha:
+
+| Cenário | No `hosts.yml` | Variáveis do servidor |
+|---|---|---|
+| `restart_asm` | host dentro de `oracle_restart` | `host_vars/<host>.yml`: `ora_asm` e o banco |
+| `si_fs` | host dentro de `oracle_si` | `host_vars/<host>.yml`: o banco (datafiles em `/u02`) |
+| `rac_asm` | subgrupo com o nome do cluster dentro de `oracle_rac`, com os nós | `group_vars/<cluster>/main.yml`: nós, SCAN, VIPs, interfaces, `ora_asm` e o banco |
+
+Rode sempre com o alvo explícito: `-e ora_hosts=<host>` (Restart, SI) ou `-e ora_hosts=<cluster>` (RAC).
+Sem ele, a fase mira em todos os servidores do grupo do cenário, e uma falha em qualquer um para
+todos (`any_errors_fatal`).
+
 ## Variáveis
 
 No inventário compartilhado (`db-toolbox/ansible/inventories/<amb>/`): o ambiente em

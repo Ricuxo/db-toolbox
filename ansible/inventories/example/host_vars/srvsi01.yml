@@ -1,0 +1,14 @@
+---
+# Single Instance em filesystem, sem Grid. O disco dos datafiles tem de estar montado em /u02 antes da
+# fase 10 (ora_db_data_mount, em group_vars/oracle_si).
+
+# Banco (fase 60)
+ora_db_name: ORCL
+ora_pdb_name: ORCLPDB1
+ora_db_total_memory_mb: 4096               # AUTO_SGA (ASMM)
+ora_db_fra_size_mb: 20480
+ora_db_redo_size_mb: 512
+
+# Serviços das aplicações (fase 65)
+ora_db_services:
+  - {name: orclpdb1_app, pdb: ORCLPDB1}

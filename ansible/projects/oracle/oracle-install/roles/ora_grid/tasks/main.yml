@@ -1,21 +1,29 @@
 ---
-# Fase 40 — Oracle Grid Infrastructure for a Standalone Server (Oracle Restart) 19c.
-# Fontes: 19c ladbi (Installing Oracle Grid Infrastructure for a Standalone Server; Running OUI
-# Using a Response File; Postinstallation Configuration Using Response File) e a página
-# "Installing Oracle Database 19c (19.32) on Oracle Linux 9 and RHEL 9" (-applyRU/-applyOneOffs).
+# Fase 40 — Oracle Grid Infrastructure 19c: for a Standalone Server (restart_asm, Oracle Restart) ou
+# for a Cluster (rac_asm, Standalone Cluster). Fontes: 19c ladbi (Installing Oracle Grid Infrastructure
+# for a Standalone Server; Running OUI Using a Response File; Postinstallation Configuration Using
+# Response File), 19c cwlin (Installing Oracle Grid Infrastructure for a New Cluster), o template oficial
+# install/response/gridsetup.rsp da mídia e a página "Installing Oracle Database 19c (19.32) on Oracle
+# Linux 9 and RHEL 9" (-applyRU/-applyOneOffs).
 # Sem bypass: nunca -ignorePrereq(Failure). O gate é a checagem do próprio gridSetup com a RU aplicada.
+# No RAC o instalador roda só no nó de instalação (o 1º de ora_rac_nodes) e copia o home para os
+# outros; orainstRoot.sh e root.sh rodam em todos, um nó por vez (throttle: 1), na ordem do inventário.
 
-- name: Grid | Só no cenário Restart + ASM
+- name: Grid | Só nos cenários com Grid (restart_asm, rac_asm)
   ansible.builtin.assert:
-    that: ora_install_type == 'restart_asm'
+    that: ora_install_type in ['restart_asm', 'rac_asm']
     fail_msg: >-
-      Esta fase é do cenário restart_asm, e o host está em {{ ora_install_type }} (grupo do
-      inventário). Em si_fs não há ASMLib nem Grid.
+      Esta fase é dos cenários restart_asm e rac_asm, e o host está em {{ ora_install_type }} (grupo do
+      inventário). Em si_fs não há Grid.
     quiet: true
 
 - name: Grid | Diskgroup criado na instalação (o primeiro de ora_asm)
   ansible.builtin.set_fact:
+    _grid_rac: "{{ ora_install_type == 'rac_asm' }}"
+    _grid_install_node: "{{ ora_install_type != 'rac_asm' or inventory_hostname == ora_rac_nodes[0].name }}"
     _grid_dg: "{{ ora_asm.diskgroups[0] }}"
+    _grid_dg_devices: >-
+      {{ ora_asm.disks | selectattr('label', 'in', ora_asm.diskgroups[0].disks) | map(attribute='device') | list }}
     _grid_ru_dir: "{{ ora_stage_patch_dir }}/{{ ora_media.ru_grid.patchid }}/{{ ora_media.ru_grid.patchid }}"
     _grid_oneoff_dirs: >-
       {{ (ora_media.oneoffs | default([])) | map(attribute='patchid')
@@ -28,6 +36,15 @@
 # O apagar do response file roda a partir do controller (bloco always). Se o controller morre
 # no meio, o arquivo com senha fica em /tmp; a próxima execução o remove ANTES de qualquer
 # checagem que possa abortar.
+- name: Grid | RAC — todos os nós do cluster nesta execução
+  ansible.builtin.assert:
+    that: ora_rac_nodes | map(attribute='name') | difference(ansible_play_hosts_all) | length == 0
+    fail_msg: >-
+      O gridSetup do cluster e os root.sh precisam de todos os nós ({{ ora_rac_nodes | map(attribute='name') | list }})
+      na mesma execução; nesta estão {{ ansible_play_hosts_all }}.
+    quiet: true
+  when: _grid_rac | bool
+
 - name: Grid | Response files de execuções interrompidas
   ansible.builtin.find:
     paths: /tmp
@@ -89,11 +106,23 @@
   register: _grid_applied
   when: _grid_ps.stat.isdir | default(false)
 
+# No RAC o gridSetup copia o home para os outros nós: lá o Grid home tem de estar ausente ou vazio.
+- name: Grid | RAC — conteúdo do Grid home nos outros nós
+  ansible.builtin.find:
+    paths: "{{ ora_grid_home }}"
+    file_type: any
+    hidden: true
+  register: _grid_remote_home
+  when:
+    - _grid_rac | bool
+    - not _grid_install_node | bool
+
 - name: Grid | Abortar se não for um servidor limpo
   vars:
     _found: >-
       {{ (_grid_signs.results | selectattr('stat.exists') | map(attribute='item') | list)
-         + (_grid_applied.files | default([]) | map(attribute='path') | list) }}
+         + (_grid_applied.files | default([]) | map(attribute='path') | list)
+         + ([ora_grid_home ~ ' (não vazio)'] if (_grid_remote_home.matched | default(0)) > 0 else []) }}
   ansible.builtin.assert:
     that:
       - _grid_running.rc != 0
@@ -117,22 +146,25 @@
     quiet: true
   no_log: true
 
-- name: Grid | Mídia íntegra no stage
+- name: Grid | Mídia no stage
   ansible.builtin.include_role:
     name: ora_stage
     tasks_from: verify
+  when: _grid_install_node | bool
 
 - name: Grid | RU e one-offs extraídos (fase 20)
   ansible.builtin.stat:
     path: "{{ item }}"
   loop: "{{ [_grid_ru_dir] + _grid_oneoff_dirs }}"
   register: _grid_patch_dirs
+  when: _grid_install_node | bool
 
 - name: Grid | Falta extrair patch
   ansible.builtin.assert:
     that: _grid_patch_dirs.results | rejectattr('stat.exists') | list | length == 0
     fail_msg: "Patch não extraído: {{ _grid_patch_dirs.results | rejectattr('stat.exists') | map(attribute='item') | list }}. Rode a fase 20."
     quiet: true
+  when: _grid_install_node | bool
 
 - name: Grid | Discos ASM visíveis (fase 30)
   ansible.builtin.command: oracleasm listdisks
@@ -140,6 +172,38 @@
   changed_when: false
   check_mode: false
   failed_when: _grid_dg.disks | difference(_grid_asmdisks.stdout_lines) | length > 0
+  when: not _grid_rac | bool
+
+# RAC: discos por regra udev (fase 15), sem ASMLib. Dono, grupo e modo conferidos em todos os nós.
+- name: Grid | RAC — discos do ASM (fase 15)
+  ansible.builtin.stat:
+    path: "{{ item.device }}"
+    follow: true
+  loop: "{{ ora_asm.disks }}"
+  loop_control:
+    label: "{{ item.label }} {{ item.device }}"
+  register: _grid_rac_disks
+  when: _grid_rac | bool
+
+- name: Grid | RAC — discos com {{ ora_owner }}:{{ ora_grid_osdba }} 0660
+  ansible.builtin.assert:
+    that: >-
+      _grid_rac_disks.results | rejectattr('stat.exists') | list | length == 0
+      and _grid_rac_disks.results | rejectattr('stat.pw_name', 'equalto', ora_owner) | list | length == 0
+      and _grid_rac_disks.results | rejectattr('stat.mode', 'equalto', '0660') | list | length == 0
+    fail_msg: "Disco do ASM ausente ou com dono/modo errado em {{ inventory_hostname }}. Rode a fase 15."
+    quiet: true
+  when: _grid_rac | bool
+
+- name: Grid | RAC — cvuqdisk instalado nos outros nós
+  ansible.builtin.command: rpm -q cvuqdisk
+  register: _grid_rac_cvuqdisk
+  changed_when: false
+  check_mode: false
+  failed_when: _grid_rac_cvuqdisk.rc != 0
+  when:
+    - _grid_rac | bool
+    - not _grid_install_node | bool
 
 # Descompactar, trocar o OPatch e instalar o cvuqdisk não têm como ser simulados: num servidor limpo
 # o Grid home ainda não existe (o unarchive falha em --check, e o grep do OPatch e o find do cvuqdisk
@@ -162,71 +226,74 @@
     - "{{ ora_grid_home | dirname }}"
     - "{{ ora_grid_home }}"
 
-- name: Grid | Descompactar a mídia 19.3 no Grid home
-  ansible.builtin.unarchive:
-    src: "{{ ora_stage_dir }}/{{ ora_media.grid_base.file }}"
-    dest: "{{ ora_grid_home }}"
-    remote_src: true
-    creates: "{{ ora_grid_home }}/gridSetup.sh"
-  become: true
-  become_user: "{{ ora_owner }}"
+- name: Grid | Software só no nó de instalação
+  when: _grid_install_node | bool
+  block:
+    - name: Grid | Descompactar a mídia 19.3 no Grid home
+      ansible.builtin.unarchive:
+        src: "{{ ora_stage_dir }}/{{ ora_media.grid_base.file }}"
+        dest: "{{ ora_grid_home }}"
+        remote_src: true
+        creates: "{{ ora_grid_home }}/gridSetup.sh"
+      become: true
+      become_user: "{{ ora_owner }}"
 
-- name: Grid | Versão do OPatch no Grid home
-  ansible.builtin.command: grep -oP '(?<=OPATCH_VERSION:)\S+' {{ ora_grid_home }}/OPatch/version.txt
-  register: _grid_opatch
-  changed_when: false
-  check_mode: false
+    - name: Grid | Versão do OPatch no Grid home
+      ansible.builtin.command: grep -oP '(?<=OPATCH_VERSION:)\S+' {{ ora_grid_home }}/OPatch/version.txt
+      register: _grid_opatch
+      changed_when: false
+      check_mode: false
 
-- name: Grid | Guardar o OPatch antigo (abaixo de {{ ora_grid_opatch_min }})
-  ansible.builtin.command:
-    argv: [mv, -n, "{{ ora_grid_home }}/OPatch", "{{ ora_grid_home }}/OPatch.{{ _grid_opatch.stdout }}"]
-    creates: "{{ ora_grid_home }}/OPatch.{{ _grid_opatch.stdout }}"
-  become: true
-  become_user: "{{ ora_owner }}"
-  when: _grid_opatch.stdout is version(ora_grid_opatch_min, '<')
+    - name: Grid | Guardar o OPatch antigo (abaixo de {{ ora_grid_opatch_min }})
+      ansible.builtin.command:
+        argv: [mv, -n, "{{ ora_grid_home }}/OPatch", "{{ ora_grid_home }}/OPatch.{{ _grid_opatch.stdout }}"]
+        creates: "{{ ora_grid_home }}/OPatch.{{ _grid_opatch.stdout }}"
+      become: true
+      become_user: "{{ ora_owner }}"
+      when: _grid_opatch.stdout is version(ora_grid_opatch_min, '<')
 
-- name: Grid | Instalar o OPatch do stage
-  ansible.builtin.unarchive:
-    src: "{{ ora_stage_dir }}/{{ ora_media.opatch.file }}"
-    dest: "{{ ora_grid_home }}"
-    remote_src: true
-    creates: "{{ ora_grid_home }}/OPatch/opatch"
-  become: true
-  become_user: "{{ ora_owner }}"
+    - name: Grid | Instalar o OPatch do stage
+      ansible.builtin.unarchive:
+        src: "{{ ora_stage_dir }}/{{ ora_media.opatch.file }}"
+        dest: "{{ ora_grid_home }}"
+        remote_src: true
+        creates: "{{ ora_grid_home }}/OPatch/opatch"
+      become: true
+      become_user: "{{ ora_owner }}"
 
-# cvuqdisk (PRVG-11550). 19c cwadd "Known Issues": instalar o cvuqdisk do diretório rpm da mídia,
-# como root; CVUQDISK_GRP define o grupo dono (padrão oinstall).
-- name: Grid | Pacote cvuqdisk da mídia
-  ansible.builtin.find:
-    paths: "{{ ora_grid_home }}/cv/rpm"
-    patterns: "cvuqdisk-*.rpm"
-  register: _grid_cvuqdisk
+    # cvuqdisk (PRVG-11550). 19c cwadd "Known Issues": instalar o cvuqdisk do diretório rpm da mídia,
+    # como root; CVUQDISK_GRP define o grupo dono (padrão oinstall).
+    - name: Grid | Pacote cvuqdisk da mídia
+      ansible.builtin.find:
+        paths: "{{ ora_grid_home }}/cv/rpm"
+        patterns: "cvuqdisk-*.rpm"
+      register: _grid_cvuqdisk
 
-# O cvuqdisk da Oracle não é assinado ("Signature: (none)"). Aqui só se exige que os digests internos
-# do RPM batam.
-- name: Grid | Integridade do cvuqdisk (rpm -K)
-  ansible.builtin.command: rpm -K {{ _grid_cvuqdisk.files[0].path }}
-  register: _grid_cvuqdisk_sig
-  changed_when: false
-  check_mode: false
-  failed_when: >-
-    _grid_cvuqdisk.files | length != 1 or 'digests' not in _grid_cvuqdisk_sig.stdout
-    or 'NOT OK' in _grid_cvuqdisk_sig.stdout
+    # O cvuqdisk da Oracle não é assinado ("Signature: (none)"). Aqui só se exige que os digests internos
+    # do RPM batam.
+    - name: Grid | Integridade do cvuqdisk (rpm -K)
+      ansible.builtin.command: rpm -K {{ _grid_cvuqdisk.files[0].path }}
+      register: _grid_cvuqdisk_sig
+      changed_when: false
+      check_mode: false
+      failed_when: >-
+        _grid_cvuqdisk.files | length != 1 or 'digests' not in _grid_cvuqdisk_sig.stdout
+        or 'NOT OK' in _grid_cvuqdisk_sig.stdout
 
-- name: Grid | cvuqdisk já instalado?
-  ansible.builtin.command: rpm -q cvuqdisk
-  register: _grid_cvuqdisk_q
-  changed_when: false
-  failed_when: false
-  check_mode: false
+    - name: Grid | cvuqdisk já instalado?
+      ansible.builtin.command: rpm -q cvuqdisk
+      register: _grid_cvuqdisk_q
+      changed_when: false
+      failed_when: false
+      check_mode: false
 
-# Procedimento literal da doc ("rpm -iv cvuqdisk-...rpm" como root). O módulo dnf recusa pacote
-# local sem assinatura, e desligar a checagem de GPG não é o caminho.
-- name: Grid | Instalar o cvuqdisk (rpm -iv, como na doc)
-  ansible.builtin.command: rpm -iv {{ _grid_cvuqdisk.files[0].path }}
-  environment:
-    CVUQDISK_GRP: "{{ ora_install_group }}"
-  when: _grid_cvuqdisk_q.rc != 0
+    # Procedimento literal da doc ("rpm -iv cvuqdisk-...rpm" como root). O módulo dnf recusa pacote
+    # local sem assinatura, e desligar a checagem de GPG não é o caminho.
+    - name: Grid | Instalar o cvuqdisk (rpm -iv, como na doc)
+      ansible.builtin.command: rpm -iv {{ _grid_cvuqdisk.files[0].path }}
+      environment:
+        CVUQDISK_GRP: "{{ ora_install_group }}"
+      when: _grid_cvuqdisk_q.rc != 0
 
 # ---------- Pré-requisitos ----------
 # O gate é a checagem integrada ao gridSetup ("Oracle Universal Installer is fully integrated with
@@ -245,6 +312,7 @@
         state: directory
         prefix: ora_grid_
       register: _grid_tmp
+      when: _grid_install_node | bool
 
     - name: Grid | Diretório temporário só do dono
       ansible.builtin.file:
@@ -252,15 +320,17 @@
         owner: "{{ ora_owner }}"
         group: "{{ ora_install_group }}"
         mode: "0700"
+      when: _grid_install_node | bool
 
     - name: Grid | Response file (0600, dono {{ ora_owner }})
       ansible.builtin.template:
-        src: gridsetup.rsp.j2
+        src: "{{ 'gridsetup_rac.rsp.j2' if _grid_rac | bool else 'gridsetup.rsp.j2' }}"
         dest: "{{ _grid_tmp.path }}/gridsetup.rsp"
         owner: "{{ ora_owner }}"
         group: "{{ ora_install_group }}"
         mode: "0600"
       no_log: true
+      when: _grid_install_node | bool
 
     - name: Grid | gridSetup.sh -silent -applyRU -applyOneOffs (pode levar mais de 1 h)
       ansible.builtin.command:
@@ -275,6 +345,7 @@
       async: 10800
       poll: 60
       register: _grid_setup
+      when: _grid_install_node | bool
       # rc 6 = "Successfully Setup Software with warning(s)". Só passa se TODOS os avisos estiverem
       # em ora_grid_accept_warnings (vazio por padrão: qualquer aviso para a fase).
       failed_when: >-
@@ -284,11 +355,15 @@
           and (_grid_setup.stdout | regex_findall('\\[WARNING\\] \\[(INS-[0-9]+)\\]')
                | difference(ora_grid_accept_warnings) | length == 0))
 
+    # RAC: um nó por vez, na ordem do inventário (o nó de instalação primeiro). O root.sh do cluster
+    # tem de terminar no primeiro nó antes de começar nos demais (19c cwlin: run the root.sh script on
+    # the first node, then on the other nodes).
     - name: Grid | orainstRoot.sh (primeiro inventário do servidor)
       ansible.builtin.command: "{{ ora_inventory_dir }}/orainstRoot.sh"
       args:
         creates: /etc/oraInst.loc
         removes: "{{ ora_inventory_dir }}/orainstRoot.sh"
+      throttle: 1
 
     - name: Grid | root.sh
       ansible.builtin.command: "{{ ora_grid_home }}/root.sh"
@@ -296,6 +371,7 @@
         creates: /etc/oracle/olr.loc
       async: 3600
       poll: 30
+      throttle: 1
 
     - name: Grid | Configuration tools (-executeConfigTools)
       ansible.builtin.command:
@@ -312,6 +388,7 @@
       poll: 30
       register: _grid_cfg
       failed_when: _grid_cfg.rc != 0
+      when: _grid_install_node | bool
 
   always:
     - name: Grid | Apagar o response file
@@ -329,7 +406,31 @@
     _grid_res.rc != 0 or
     (_grid_res.stdout | regex_search('ora\\.asm\\s*\\n\\s*ONLINE\\s+ONLINE') is none) or
     (_grid_res.stdout | regex_search('ora\\.' ~ _grid_dg.name ~ '\\.dg\\s*\\n\\s*ONLINE\\s+ONLINE') is none)
+  when: not _grid_rac | bool
+
+# RAC: todos os nós ativos no cluster e o ASM e o diskgroup do OCR rodando em todos.
+- name: Grid | RAC — nós do cluster (olsnodes -s)
+  ansible.builtin.command: "{{ ora_grid_home }}/bin/olsnodes -s"
+  register: _grid_olsnodes
+  changed_when: false
+  failed_when: >-
+    _grid_olsnodes.rc != 0 or
+    ora_rac_nodes | map(attribute='name')
+    | reject('in', _grid_olsnodes.stdout_lines | select('search', '\\sActive$') | map('split') | map('first') | list)
+    | list | length > 0
+  when: _grid_rac | bool and _grid_install_node | bool
+
+- name: Grid | RAC — recursos do cluster
+  ansible.builtin.command: "{{ ora_grid_home }}/bin/crsctl stat res -t"
+  register: _grid_res_rac
+  changed_when: false
+  failed_when: >-
+    _grid_res_rac.rc != 0 or
+    (_grid_res_rac.stdout | regex_findall('ora\\.' ~ _grid_dg.name ~ '\\.dg') | length == 0) or
+    (_grid_res_rac.stdout | regex_search('ora\\.scan1\\.vip') is none)
+  when: _grid_rac | bool and _grid_install_node | bool
 
 - name: Grid | Resumo
   ansible.builtin.debug:
-    msg: "{{ _grid_res.stdout_lines }}"
+    msg: "{{ (_grid_olsnodes.stdout_lines | default([])) + ((_grid_res_rac if _grid_rac | bool else _grid_res).stdout_lines) }}"
+  when: _grid_install_node | bool

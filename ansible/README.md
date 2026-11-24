@@ -8,6 +8,7 @@ ansible/
 │   ├── hosts.yml
 │   ├── group_vars/
 │   └── host_vars/
+├── inventories/example/         # modelo com um servidor de cada cenário (valores fictícios)
 └── projects/<banco>/
     ├── .claude/skills/          # skills dos projetos deste banco
     └── <projeto>/               # ex.: oracle-install (README, playbooks, roles)

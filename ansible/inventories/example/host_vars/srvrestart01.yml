@@ -1,0 +1,18 @@
+---
+# Oracle Restart + ASM (ASMLib v3, fase 30). Discos sempre por /dev/disk/by-id/, nunca /dev/sdX.
+ora_asm:
+  disks:
+    - {label: DATA01, device: /dev/disk/by-id/wwn-0x6000c29000000000000000000000a001}
+  diskgroups:                              # o 1º é criado no gridSetup
+    - {name: DATA, redundancy: EXTERNAL, disks: [DATA01]}
+
+# Banco (fase 60)
+ora_db_name: ORCL
+ora_pdb_name: ORCLPDB1
+ora_db_total_memory_mb: 8192               # AUTO_SGA (ASMM)
+ora_db_fra_size_mb: 20480
+ora_db_redo_size_mb: 512
+
+# Serviços das aplicações (fase 65)
+ora_db_services:
+  - {name: orclpdb1_app, pdb: ORCLPDB1}

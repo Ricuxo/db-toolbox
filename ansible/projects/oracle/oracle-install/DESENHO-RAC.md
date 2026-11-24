@@ -22,22 +22,24 @@ RU **19.30** (GIRU 38629535) nos dois homes, mais o one-off **38609069**. Dono �
 | 65 db_service | `srvctl add service -preferred <inst1>,<inst2>` | `orclrac1` |
 | 70 hugepages | por nó, um de cada vez (reinicia uma instância por vez) | os dois nós, em série |
 
-O "nó de instalação" é o primeiro host do grupo (`groups['oracle_rac'][0]`), e as fases o recusam
+O "nó de instalação" é o primeiro de `ora_rac_nodes` (variável do cluster), e as fases o recusam
 se a mídia não estiver nele.
 
 ## 2. Inventário (`inventories/lab/`)
 
 ```yaml
 # hosts.yml, dentro de oracle.children
-        oracle_rac:                        # RAC (Grid Infrastructure for a Cluster + ASM)
-          hosts:
-            orclrac1:
-              ansible_host: 192.168.15.170
-            orclrac2:
-              ansible_host: 192.168.15.171
+        oracle_rac:                        # RAC: um subgrupo por cluster
+          children:
+            rac_orclrac:
+              hosts:
+                orclrac1:
+                  ansible_host: 192.168.15.170
+                orclrac2:
+                  ansible_host: 192.168.15.171
 ```
 
-`group_vars/oracle_rac/main.yml` (valores do cluster, iguais para os dois nós):
+`group_vars/rac_orclrac/main.yml` (valores do cluster, iguais para os dois nós; cada cluster é um subgrupo de `oracle_rac`, e o `group_vars/oracle_rac/` só tem o cenário e o Grid home):
 
 ```yaml
 ora_install_type: rac_asm

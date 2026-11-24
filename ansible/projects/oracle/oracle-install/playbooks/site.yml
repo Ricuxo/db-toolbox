@@ -16,7 +16,7 @@
 - name: Fase 30 — ASMLib v3
   ansible.builtin.import_playbook: 30_asmlib.yml
 
-- name: Fase 40 — Grid Infrastructure (Restart)
+- name: Fase 40 — Grid Infrastructure (Restart ou RAC)
   ansible.builtin.import_playbook: 40_grid.yml
 
 - name: Fase 50 — software do Oracle Database

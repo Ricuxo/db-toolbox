@@ -1,0 +1,36 @@
+---
+# Cluster RAC rac_cluster01. Tudo aqui vale para os nós deste cluster (e só para eles).
+
+# Cluster (chaves do template oficial install/response/gridsetup.rsp da mídia 19.3).
+ora_rac_cluster_name: cluster01            # até 63 caracteres: letras, números e hífen (gridsetup.rsp)
+ora_rac_scan_name: cluster01-scan.example.com   # no DNS, com 3 IPs
+ora_rac_scan_port: 1521
+ora_rac_nodes:                             # clusterNodes = <nome público>:<VIP>; o 1º é o nó de instalação
+  - {name: srvrac01, vip: srvrac01-vip}
+  - {name: srvrac02, vip: srvrac02-vip}
+ora_rac_interfaces:                        # networkInterfaceList: 1 = PUBLIC, 5 = ASM & PRIVATE
+  - {name: eth0, subnet: 10.0.0.0, type: 1}
+  - {name: eth1, subnet: 10.10.10.0, type: 5}
+
+# LUNs compartilhados por todos os nós, por WWN (/dev/disk/by-id/wwn-*): a fase 15 grava a regra udev
+# casada por ele (oracle:asmdba 0660). Só disco vazio.
+ora_asm:
+  disks:
+    - {label: OCR1,  device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b001}
+    - {label: OCR2,  device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b002}
+    - {label: OCR3,  device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b003}
+    - {label: DATA1, device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b004}
+    - {label: FRA1,  device: /dev/disk/by-id/wwn-0x6001405000000000000000000000b005}
+  diskgroups:                              # o 1º (OCR e voting files) é criado no gridSetup
+    - {name: OCR,  redundancy: EXTERNAL, disks: [OCR1, OCR2, OCR3]}
+    - {name: DATA, redundancy: EXTERNAL, disks: [DATA1]}
+    - {name: FRA,  redundancy: EXTERNAL, disks: [FRA1]}
+
+# Banco RAC (fases 60 e 65, ainda em construção para o rac_asm)
+ora_db_name: ORCL
+ora_pdb_name: ORCLPDB1
+ora_db_total_memory_mb: 4096
+ora_db_fra_size_mb: 20480
+ora_db_redo_size_mb: 512
+ora_db_services:
+  - {name: orclpdb1_app, pdb: ORCLPDB1}

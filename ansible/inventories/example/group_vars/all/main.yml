@@ -1,0 +1,6 @@
+---
+# Só o que vale para TODO servidor deste ambiente.
+
+# Nome do ambiente: tem de ser igual ao nome do diretório do inventário (lab, dev, hml ou prod).
+# Os playbooks recusam rodar sem ele ou com valor diferente do diretório.
+ora_env: TROCAR_PELO_NOME_DO_DIRETORIO

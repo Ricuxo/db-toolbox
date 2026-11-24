@@ -1,0 +1,11 @@
+---
+# Cenário RAC: Grid Infrastructure for a Cluster (Standalone Cluster) + ASM, discos com dono e
+# permissão por regra udev casada pelo WWN (fase 15), sem ASMLib e sem AFD. Banco RAC em ASM.
+ora_install_type: rac_asm
+
+# cwlin 19c, "About the Oracle Home Directory for Oracle Grid Infrastructure": num cluster o Grid home
+# "must not be placed under one of the Oracle base directories" (exemplo do guia: /u01/app/19.0.0/grid).
+# O nome <major>.<ru>.0.0 vem de ora_home_version (group_vars/oracle).
+ora_grid_home: "{{ ora_app_dir }}/{{ ora_home_version }}/grid"
+
+# Valores de cada cluster (nós, SCAN, VIPs, interfaces, discos e banco): group_vars/<cluster>/main.yml.
