@@ -205,6 +205,36 @@ Rode sempre com o alvo explícito: `-e ora_hosts=<host>` (Restart, SI) ou `-e or
 Sem ele, a fase mira em todos os servidores do grupo do cenário, e uma falha em qualquer um para
 todos (`any_errors_fatal`).
 
+## Mais de um banco no mesmo servidor
+
+A fase 60 guarda só o `ora_db_name` da execução (oratab, `srvctl config`, pmon, `+<dg>/<nome>`,
+logdir do dbca): um banco com **outro nome** passa pela guarda e é criado ao lado do existente,
+no mesmo Oracle home (a fase 50 recusa um segundo home — não se instala home por banco). Rode as
+fases 60 e 65 (e a 70, se ainda não tiver rodado) com as variáveis do banco novo.
+
+O que muda de um banco para outro é só o bloco `ora_db_*`: `ora_db_name`, `ora_pdb_name`,
+`ora_db_services`, memória e diskgroups. Duas formas de dar esses valores à execução:
+
+- **Grupo filho por banco no inventário** (recomendado; fica versionado). Os hosts ficam nos
+  grupos-filhos de `oracle_rac`/`oracle_restart`/`oracle_si`, e cada filho tem `group_vars` com o
+  seu bloco `ora_db_*` — grupo filho tem precedência sobre o pai:
+  ```
+  [rac_orclrac:children]      # cluster/ASM em group_vars/rac_orclrac
+  rac_orclrac_orcl            # group_vars/rac_orclrac_orcl: ora_db_name=ORCL …
+  rac_orclrac_orcl2           # group_vars/rac_orclrac_orcl2: ora_db_name=ORCL2 …
+  ```
+  e roda `-e ora_hosts=rac_orclrac_orcl2`. Em `rac_asm`, as vars de cluster (`ora_rac_*`,
+  `ora_asm`) ficam no pai `rac_orclrac` e só as de banco vão para os filhos.
+- **Arquivo de extra-vars** (sem mexer no inventário): `-e @vars_db_<nome>.yml` com o bloco
+  `ora_db_*`; extra-vars vencem group_vars.
+
+Repetir a fase 60 com o **mesmo** `ora_db_name` recusa (`failed=1`, `changed=0`), como sempre.
+
+A fase 70 soma os segmentos de memória compartilhada de **todas** as instâncias locais
+(`sysresv` por cada `ora_pmon_*` do host; o ASM fica fora, por usar AMM), então o
+`vm.nr_hugepages` cobre todos os bancos do servidor — basta rodá-la de novo depois de criar o
+segundo banco para o valor subir.
+
 ## Variáveis
 
 No inventário compartilhado (`db-toolbox/ansible/inventories/<amb>/`): o ambiente em

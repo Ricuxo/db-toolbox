@@ -24,17 +24,24 @@
   changed_when: false
   check_mode: false
 
-# Segmentos de memória compartilhada da instância, pelo sysresv do próprio Oracle home; cada um
+# Segmentos de memória compartilhada das instâncias, pelo sysresv do próprio Oracle home; cada um
 # arredondado para cima em HugePages (mesma lógica do script da MOS 401749.1). No lab: 3074 páginas,
 # igual ao EXPECTED_PAGES que a instância pediu com USE_LARGE_PAGES=ONLY (com TRUE ela pedia 3073 e
 # usava mais 15 páginas de 4K — por isso só o sga_max_size não basta).
-- name: HugePages | Segmentos de memória compartilhada da instância (sysresv)
+# nr_hugepages tem de cobrir o SGA de TODAS as instâncias do host, não só a do banco da vez:
+# os SIDs locais saem do argv dos pmon (ps -eo args, sem o truncamento de 15 chars do comm;
+# o ASM, de argv asm_pmon_+ASM<n>, fica de fora — usa AMM e não é elegível a HugePages; a
+# margem de ora_hugepages_extra cobre o segmento pequeno dele). Em host com um só banco o
+# resultado é o mesmo de antes.
+- name: HugePages | Segmentos de memória compartilhada das instâncias locais (sysresv)
   ansible.builtin.shell: |
     set -o pipefail
     hp_bytes=$(( $(awk '/^Hugepagesize:/{print $2}' /proc/meminfo) * 1024 ))
-    ids=$({{ ora_db_home }}/bin/sysresv -l {{ _hp_sid | default(ora_db_name) }} \
-          | awk '/^Shared Memory:/{f=1;next} /^Semaphores:/{f=0} f && $1 ~ /^[0-9]+$/ {print $1}')
-    [ -n "$ids" ] || { echo "sysresv não listou segmentos de {{ ora_db_name }}" >&2; exit 1; }
+    sids=$(ps -eo args | sed -n 's/^ora_pmon_\([A-Za-z0-9_]*\).*/\1/p' | sort -u)
+    [ -n "$sids" ] || { echo "nenhum pmon de banco (ora_pmon_*) neste host" >&2; exit 1; }
+    ids=$(for sid in $sids; do {{ ora_db_home }}/bin/sysresv -l "$sid"; done \
+          | awk '/^Shared Memory/{f=1;next} /^Semaphores/{f=0} f && $1 ~ /^[0-9]+$/ {print $1}')
+    [ -n "$ids" ] || { echo "sysresv não listou segmentos ($sids)" >&2; exit 1; }
     ipcs -m | awk -v ids="$ids" -v hp="$hp_bytes" \
       'BEGIN{n=split(ids,a); for(i=1;i<=n;i++) w[a[i]]=1}
        ($2 in w){p+=int(($5+hp-1)/hp); c++} END{printf "SHM_PAGES=%d\nSHM_SEGMENTS=%d\n", p, c}'
