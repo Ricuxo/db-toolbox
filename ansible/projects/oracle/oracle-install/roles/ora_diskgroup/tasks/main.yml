@@ -1,0 +1,218 @@
+---
+# Fase 45 — diskgroups do ASM além do primeiro (que o gridSetup cria na fase 40), por
+# CREATE DISKGROUP via sqlplus / as sysasm no nó de instalação (o 1º de ora_rac_nodes). A doc 19c
+# usa o asmca; o CREATE DISKGROUP do SQL*Plus faz o mesmo sem a senha do SYSASM (Storage Admin Guide
+# 19c, "Creating Disk Groups" / "Manually Creating a Disk Group"). A CRS registra o recurso
+# ora.<dg>.dg sozinha ao montar o diskgroup.
+# Idempotente: diskgroup existente não é tocado; disco com header ASM (ORCLDISK) aborta, porque
+# mudar disco em uso é decisão do DBA (regra do projeto: só disco vazio).
+
+- name: Diskgroup | Só no cenário RAC
+  ansible.builtin.assert:
+    that: ora_install_type == 'rac_asm'
+    fail_msg: >-
+      Esta fase é do cenário rac_asm (diskgroups além do do OCR). Em restart_asm o diskgroup único
+      já sai na fase 30/40; em si_fs não há ASM.
+    quiet: true
+
+- name: Diskgroup | Nó de instalação (o 1º de ora_rac_nodes) e SID do ASM local
+  ansible.builtin.set_fact:
+    _dg_install_node: "{{ inventory_hostname == ora_rac_nodes[0].name }}"
+    _dg_sid: "+ASM{{ (ora_rac_nodes | map(attribute='name') | list).index(inventory_hostname) + 1 }}"
+
+- name: Diskgroup | Ambiente do ASM
+  ansible.builtin.set_fact:
+    _dg_env:
+      ORACLE_HOME: "{{ ora_grid_home }}"
+      ORACLE_BASE: "{{ ora_base }}"
+      ORACLE_SID: "{{ _dg_sid }}"
+
+- name: Diskgroup | Todos os nós do cluster nesta execução
+  ansible.builtin.assert:
+    that: ora_rac_nodes | map(attribute='name') | sort == ansible_play_hosts_all | sort
+    fail_msg: >-
+      A criação de diskgroup afeta o cluster inteiro; nesta execução estão
+      {{ ansible_play_hosts_all }}, mas o cluster é {{ ora_rac_nodes | map(attribute='name') | list }}.
+      Use -e ora_hosts=<grupo do cluster>.
+    quiet: true
+
+- name: Diskgroup | ASM no ar neste nó
+  ansible.builtin.command: "{{ ora_grid_home }}/bin/crsctl stat res ora.asm"
+  register: _dg_asm
+  changed_when: false
+  check_mode: false
+  failed_when: _dg_asm.rc != 0 or 'STATE=ONLINE' not in _dg_asm.stdout
+
+- name: Diskgroup | Diskgroups existentes (asmcmd lsdg)
+  ansible.builtin.command: "{{ ora_grid_home }}/bin/asmcmd lsdg --suppressheader"
+  environment: "{{ _dg_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dg_lsdg
+  changed_when: false
+  check_mode: false
+  failed_when: _dg_lsdg.rc != 0
+
+# A criação só roda no nó de instalação; os demais só conferem o resultado (está montado no
+# cluster inteiro quando a CRS sobe o recurso). lsdg traz o nome na última coluna, com '/' no fim.
+- name: Diskgroup | Diskgroups a criar (ora_asm.diskgroups depois do primeiro)
+  ansible.builtin.set_fact:
+    _dg_missing: >-
+      {{ ora_asm.diskgroups | rejectattr('name', 'in', _dg_lsdg.stdout_lines
+         | map('regex_replace', '.*\s(\S+)/\s*$', '\1') | list) | list }}
+  when: _dg_install_node | bool
+
+- name: Diskgroup | Discos dos diskgroups novos
+  ansible.builtin.set_fact:
+    _dg_new_disks: >-
+      {{ _dg_missing | map(attribute='disks') | flatten | unique
+         | map('extract', dict(ora_asm.disks | map(attribute='label') | zip(ora_asm.disks | map(attribute='device'))))
+         | list }}
+  when: _dg_install_node | bool
+
+- name: Diskgroup | Assinatura nos discos novos (blkid -p)
+  ansible.builtin.command: blkid -p {{ item }}
+  register: _dg_blkid
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  loop: "{{ _dg_new_disks }}"
+  loop_control:
+    label: "{{ item }}"
+  when: _dg_install_node | bool
+
+# blkid vazio = disco cru (OK). Qualquer assinatura — ORCLDISK, PTTYPE, xfs — aborta: só se cria
+# diskgroup em disco vazio.
+- name: Diskgroup | Discos novos sem assinatura
+  ansible.builtin.assert:
+    that: _dg_blkid.results | selectattr('rc', 'equalto', 0) | list | length == 0
+    fail_msg: >-
+      Disco já marcado/em uso: {{ _dg_blkid.results | selectattr('rc', 'equalto', 0)
+      | map(attribute='item') | list }}. Diskgroup só se cria em disco vazio; se for sobra de
+      tentativa, limpe o header antes de rodar de novo.
+    quiet: true
+  when: _dg_install_node | bool
+
+- name: Diskgroup | CREATE DISKGROUP (sqlplus / as sysasm)
+  ansible.builtin.command:
+    argv: ["{{ ora_grid_home }}/bin/sqlplus", -S, "/ as sysasm"]
+    stdin: |
+      whenever sqlerror exit failure
+      {% for dg in _dg_missing %}
+      create diskgroup {{ dg.name }} {{ dg.redundancy | default('EXTERNAL') }} redundancy
+      disk '{{ dg.disks | map('extract', dict(ora_asm.disks | map(attribute='label') | zip(ora_asm.disks | map(attribute='device')))) | join("', '") }}'
+      attribute 'compatible.asm'='19.0.0.0.0', 'compatible.rdbms'='19.0.0.0.0';
+      {% endfor %}
+      exit
+  environment: "{{ _dg_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dg_create
+  when: (_dg_install_node | bool) and (_dg_missing | length > 0)
+
+# Sem os atributos, o CREATE DISKGROUP deixa compatible.asm=11.2.0.2.0 — e o dbca aborta com
+# DBT-05802 ao gravar o password file no diskgroup (exige >= 12.1.0.0.0; Storage Admin Guide 19c,
+# "Disk Group Compatibility"). Diskgroup que já existia (criado antes desta correção) recebe
+# ALTER DISKGROUP SET ATTRIBUTE — idempotente: o valor pedido é 19.0.0.0.0, o mesmo do CREATE.
+- name: Diskgroup | Atributos compatible dos diskgroups gerenciados
+  ansible.builtin.command:
+    argv: ["{{ ora_grid_home }}/bin/sqlplus", -S, "/ as sysasm"]
+    stdin: |
+      set heading off feedback off pagesize 0
+      select d.name||'.'||a.name||'='||a.value
+      from v$asm_attribute a join v$asm_diskgroup d on a.group_number = d.group_number
+      where a.name in ('compatible.asm', 'compatible.rdbms')
+      and d.name in ('{{ ora_asm.diskgroups[1:] | map(attribute='name') | join("','") }}');
+      exit
+  environment: "{{ _dg_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dg_compat
+  changed_when: false
+  check_mode: false
+  failed_when: _dg_compat.rc != 0
+  when: _dg_install_node | bool
+
+- name: Diskgroup | Diskgroups com compatible desatualizado
+  ansible.builtin.set_fact:
+    _dg_compat_fix: >-
+      {{ _dg_compat.stdout_lines | reject('search', '=19\.0')
+         | map('regex_replace', '\..*$', '') | unique | list }}
+  when: _dg_install_node | bool
+
+- name: Diskgroup | ALTER DISKGROUP SET ATTRIBUTE compatible (sqlplus / as sysasm)
+  ansible.builtin.command:
+    argv: ["{{ ora_grid_home }}/bin/sqlplus", -S, "/ as sysasm"]
+    stdin: |
+      whenever sqlerror exit failure
+      {% for dg in _dg_compat_fix %}
+      alter diskgroup {{ dg }} set attribute 'compatible.asm'='19.0.0.0.0';
+      alter diskgroup {{ dg }} set attribute 'compatible.rdbms'='19.0.0.0.0';
+      {% endfor %}
+      exit
+  environment: "{{ _dg_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dg_alter
+  when: (_dg_install_node | bool) and (_dg_compat_fix | default([]) | length > 0)
+
+# O CREATE DISKGROUP monta só na instância local; quem espalha pelo cluster é o recurso
+# ora.<dg>.dg da CRS (criado já habilitado). gv$asm_diskgroup mostra o estado por instância —
+# se algum nó estiver DISMOUNTED, srvctl start sobe o recurso no cluster inteiro.
+- name: Diskgroup | Estado por instância (gv$asm_diskgroup)
+  ansible.builtin.command:
+    argv: ["{{ ora_grid_home }}/bin/sqlplus", -S, "/ as sysasm"]
+    stdin: |
+      set heading off feedback off pagesize 0
+      select name||'='||state from gv$asm_diskgroup;
+      exit
+  environment: "{{ _dg_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dg_gv
+  changed_when: false
+  check_mode: false
+  failed_when: _dg_gv.rc != 0
+  when: _dg_install_node | bool
+
+- name: Diskgroup | Diskgroups desmontados em algum nó
+  ansible.builtin.set_fact:
+    _dg_dismounted: >-
+      {{ _dg_gv.stdout_lines | reject('search', '=MOUNTED$')
+         | map('regex_replace', '=.*$', '') | unique | list }}
+  when: _dg_install_node | bool
+
+- name: Diskgroup | Recurso da CRS montado no cluster (srvctl start)
+  ansible.builtin.command: "{{ ora_grid_home }}/bin/srvctl start diskgroup -diskgroup {{ item }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dg_srvctl
+  changed_when: true
+  loop: "{{ _dg_dismounted | default([]) }}"
+  when: (_dg_install_node | bool) and (_dg_dismounted | length > 0)
+
+- name: Diskgroup | Estado dos diskgroups (v$asm_diskgroup)
+  ansible.builtin.command:
+    argv: ["{{ ora_grid_home }}/bin/sqlplus", -S, "/ as sysasm"]
+    stdin: |
+      set heading off feedback off pagesize 0
+      select name||'='||state from v$asm_diskgroup;
+      exit
+  environment: "{{ _dg_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  register: _dg_state
+  changed_when: false
+  check_mode: false
+  until: _dg_state.rc == 0
+  retries: 6
+  delay: 5
+  failed_when: >-
+    _dg_state.rc != 0 or
+    ora_asm.diskgroups | map(attribute='name')
+    | reject('in', _dg_state.stdout_lines | select('search', '=MOUNTED$') | map('regex_replace', '=.*$', '') | list)
+    | list | length > 0
+
+- name: Diskgroup | Resumo
+  ansible.builtin.debug:
+    msg: "{{ _dg_state.stdout_lines }} {{ _dg_create.stdout_lines | default([]) }}"

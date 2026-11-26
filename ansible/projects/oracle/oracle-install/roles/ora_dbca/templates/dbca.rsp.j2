@@ -4,7 +4,14 @@
 responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v19.0.0
 gdbName={{ ora_db_name }}
 sid={{ ora_db_name }}
+{% if ora_install_type == 'rac_asm' %}
+# RAC: banco admin-managed com uma instância por nó (template oficial: databaseConfigType=RAC e
+# "Specify {node1,node2} separated by comma"). O dbca registra tudo no Clusterware.
+databaseConfigType=RAC
+nodelist={{ ora_rac_nodes | map(attribute='name') | join(',') }}
+{% else %}
 databaseConfigType=SI
+{% endif %}
 createAsContainerDatabase=true
 numberOfPDBs=1
 pdbName={{ ora_pdb_name }}
@@ -14,7 +21,7 @@ sysPassword={{ vault_ora_sys_password | trim }}
 systemPassword={{ vault_ora_system_password | trim }}
 pdbAdminPassword={{ vault_ora_pdbadmin_password | trim }}
 emConfiguration=NONE
-{% if ora_install_type == 'restart_asm' %}
+{% if ora_install_type in ['restart_asm', 'rac_asm'] %}
 storageType=ASM
 diskGroupName={{ ora_db_diskgroup }}
 recoveryGroupName={{ ora_db_fra_diskgroup }}

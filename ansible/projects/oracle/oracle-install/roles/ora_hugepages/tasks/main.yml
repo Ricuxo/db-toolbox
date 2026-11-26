@@ -11,10 +11,17 @@
 
 - name: HugePages | Ambiente do banco
   ansible.builtin.set_fact:
+    # SID local: <db><nº do nó> no RAC (orcl1, orcl2…); o nome do banco nos demais cenários.
+    _hp_sid: >-
+      {{ ora_db_name ~ ((ora_rac_nodes | map(attribute='name') | list).index(inventory_hostname) + 1)
+         if ora_install_type == 'rac_asm' else ora_db_name }}
+
+- name: HugePages | Ambiente do banco (usa _hp_sid do set_fact anterior)
+  ansible.builtin.set_fact:
     _hp_env:
       ORACLE_HOME: "{{ ora_db_home }}"
       ORACLE_BASE: "{{ ora_base }}"
-      ORACLE_SID: "{{ ora_db_name }}"
+      ORACLE_SID: "{{ _hp_sid }}"
 
 # ---------- Pré-condições (somente leitura) ----------
 - name: HugePages | Banco no ar (fase 60)
@@ -26,7 +33,7 @@
   changed_when: false
   check_mode: false
   failed_when: _hp_dbstatus.rc != 0 or 'is running' not in _hp_dbstatus.stdout
-  when: ora_install_type == 'restart_asm'
+  when: ora_install_type != 'si_fs'
 
 - name: HugePages | Banco aberto (fase 60, si_fs sem Restart)
   ansible.builtin.command:

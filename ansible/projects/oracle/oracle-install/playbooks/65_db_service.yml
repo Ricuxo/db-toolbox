@@ -1,7 +1,7 @@
 ---
-# Fase 65 — serviços do Oracle Restart para as PDBs (idempotente). Precisa da fase 60.
+# Fase 65 — serviços das PDBs (idempotente). Precisa da fase 60.
 - name: Oracle Database — serviços das PDBs
-  hosts: "{{ ora_hosts | default('oracle:!oracle_rac') }}"   # rac_asm: fase ainda não implementada
+  hosts: "{{ ora_hosts | default('oracle') }}"
   gather_facts: false
   any_errors_fatal: true
   pre_tasks:
@@ -9,6 +9,8 @@
       ansible.builtin.import_role:
         name: ora_env
       tags: [always]                # roda mesmo com --tags/--skip-tags
+      vars:
+        ora_env_phase_types: [restart_asm, si_fs, rac_asm]
   roles:
     - role: ora_db_service
       tags: [db_service]

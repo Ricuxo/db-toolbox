@@ -1,8 +1,8 @@
 ---
-# Fase 50 — software do Oracle Database (só software) no servidor com Oracle Restart.
-# Precisa das fases 10–40. Não usa senha (o banco é criado na fase 60).
+# Fase 50 — software do Oracle Database (só software) no servidor com Oracle Restart, no RAC ou
+# standalone em filesystem. Precisa das fases 10–45. Não usa senha (o banco é criado na fase 60).
 - name: Oracle Database — software
-  hosts: "{{ ora_hosts | default('oracle:!oracle_rac') }}"   # rac_asm: fase ainda não implementada
+  hosts: "{{ ora_hosts | default('oracle') }}"
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:
@@ -10,6 +10,8 @@
       ansible.builtin.import_role:
         name: ora_env
       tags: [always]                # roda mesmo com --tags/--skip-tags
+      vars:
+        ora_env_phase_types: [restart_asm, si_fs, rac_asm]
   roles:
     - role: ora_db_software
       tags: [db_software]

@@ -13,5 +13,10 @@ oracle.install.db.OSBACKUPDBA_GROUP={{ ora_db_osbackupdba }}
 oracle.install.db.OSDGDBA_GROUP={{ ora_db_osdgdba }}
 oracle.install.db.OSKMDBA_GROUP={{ ora_db_oskmdba }}
 oracle.install.db.OSRACDBA_GROUP={{ ora_db_osracdba }}
+{% if ora_install_type == 'rac_asm' %}
+# RAC: o runInstaller do nó de instalação copia o home para os demais nós (template oficial:
+# "Specify the cluster node names"). Só os nomes públicos, sem VIP.
+oracle.install.db.CLUSTER_NODES={{ ora_rac_nodes | map(attribute='name') | join(',') }}
+{% endif %}
 # false = root.sh manual ("To execute the root script manually"); a role roda o root.sh como root.
 oracle.install.db.rootconfig.executeRootScript=false

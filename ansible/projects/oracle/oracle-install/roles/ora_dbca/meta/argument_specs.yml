@@ -1,10 +1,13 @@
 ---
 argument_specs:
   main:
-    short_description: Cria o banco (CDB + PDBs) com dbca silencioso no servidor com Oracle Restart e ASM.
+    short_description: Cria o banco (CDB + PDBs) com dbca silencioso (Restart, RAC ou filesystem).
     description:
       - dbca -silent -createDatabase com response file do template oficial; nunca -ignorePrereqFailure.
-      - Aborta se o banco já existir (oratab, Restart, pmon, logs do dbca) ou com dbca rodando.
+      - "No RAC, roda só no 1º nó de ora_rac_nodes: databaseConfigType=RAC e nodelist no rsp; o
+        Clusterware registra uma instância por nó. Aborta se os diskgroups do banco forem o do OCR."
+      - Aborta se o banco já existir (oratab, Clusterware/Restart, pmon, logs do dbca) ou com dbca
+        rodando.
       - Response file 0600, dono oracle, senhas do Vault, apagado ao fim.
     options:
       ora_owner: {type: str, required: true}
@@ -12,7 +15,8 @@ argument_specs:
       ora_base: {type: path, required: true}
       ora_grid_home: {type: path, required: true}
       ora_db_home: {type: path, required: true}
-      ora_asm: {type: dict}               # obrigatório só em restart_asm (o cenário vem do inventário)
+      ora_asm: {type: dict}               # obrigatório nos cenários com ASM
+      ora_rac_nodes: {type: list, elements: dict}
       ora_db_name: {type: str, required: true}
       ora_pdb_name: {type: str, required: true}
       ora_db_total_memory_mb: {type: int, required: true}

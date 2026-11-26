@@ -1,17 +1,22 @@
 ---
 # Fase 65 — serviços de aplicação das PDBs.
-# restart_asm (restart_asm.yml): srvctl. Fontes: 19c Administrator's Guide cap. 4 ("Configuring Automatic Restart of an Oracle Database"):
+# Com Grid (restart_asm.yml, rac_asm.yml): srvctl. Fontes: 19c Administrator's Guide cap. 4 ("Configuring Automatic Restart of an Oracle Database"):
 # §4.2.11 "Oracle recommends that you use SRVCTL to create and delete database services";
 # §4.5.1.5.1 srvctl add service (-pdb; -policy AUTOMATIC: "automatically started upon restart of the
-# database"). 19c Multitenant Guide, "Managing Services for PDBs": "when you use the SRVCTL utility to
-# start a service with a PDB property for a PDB that is closed, the PDB is opened in read/write mode".
+# database"; no RAC, -preferred <instâncias>). 19c Multitenant Guide, "Managing Services for PDBs":
+# "when you use the SRVCTL utility to start a service with a PDB property for a PDB that is closed,
+# the PDB is opened in read/write mode".
 
 - name: Serviço | Ambiente do banco
   ansible.builtin.set_fact:
+    # SID local: <db><nº do nó> no RAC (orcl1, orcl2…); o nome do banco nos demais cenários.
     _svc_env:
       ORACLE_HOME: "{{ ora_db_home }}"
       ORACLE_BASE: "{{ ora_base }}"
-      ORACLE_SID: "{{ ora_db_name }}"
+      ORACLE_SID: >-
+        {{ ora_db_name ~ ((ora_rac_nodes | map(attribute='name') | list).index(inventory_hostname) + 1)
+           if ora_install_type == 'rac_asm' else ora_db_name }}
+    _svc_install_node: "{{ ora_install_type != 'rac_asm' or inventory_hostname == ora_rac_nodes[0].name }}"
 
 # si_fs (si_fs.yml): sem Restart, DBMS_SERVICE e SAVE STATE. Fonte: 19c Multitenant Guide, "Managing
 # Services for PDBs": "If your database is not being managed by Oracle Restart or Oracle Clusterware,

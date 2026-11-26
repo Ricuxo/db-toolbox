@@ -1,8 +1,8 @@
 ---
-# Fase 60 — criação do banco (CDB + PDB) com dbca. Precisa das fases 10–50 e de
+# Fase 60 — criação do banco (CDB + PDB) com dbca. Precisa das fases 10–50 (no RAC, 45) e de
 # vault_ora_sys_password / vault_ora_system_password / vault_ora_pdbadmin_password (vault.yml).
 - name: Oracle Database — criação do banco
-  hosts: "{{ ora_hosts | default('oracle:!oracle_rac') }}"   # rac_asm: fase ainda não implementada
+  hosts: "{{ ora_hosts | default('oracle') }}"
   gather_facts: true
   any_errors_fatal: true
   pre_tasks:
@@ -10,6 +10,8 @@
       ansible.builtin.import_role:
         name: ora_env
       tags: [always]                # roda mesmo com --tags/--skip-tags
+      vars:
+        ora_env_phase_types: [restart_asm, si_fs, rac_asm]
   roles:
     - role: ora_dbca
       tags: [dbca]

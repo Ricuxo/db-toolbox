@@ -1,15 +1,18 @@
 ---
 argument_specs:
   main:
-    short_description: Cria e sobe serviços do Oracle Restart associados a PDBs (idempotente).
+    short_description: Cria e sobe serviços de aplicação associados a PDBs (idempotente).
     description:
-      - srvctl add service -pdb -policy AUTOMATIC só se o serviço não existir; nunca altera um existente.
+      - "Com Grid (Restart ou RAC): srvctl add service -pdb -policy AUTOMATIC (Restart) ou -preferred
+        <instâncias> (RAC, só no 1º nó). Sem Grid: DBMS_SERVICE e SAVE STATE."
+      - Só cria se o serviço não existir; nunca altera um existente.
       - Garante o serviço rodando; subir o serviço abre a PDB em READ WRITE.
     options:
       ora_owner: {type: str, required: true}
       ora_base: {type: path, required: true}
       ora_db_home: {type: path, required: true}
       ora_db_name: {type: str, required: true}
+      ora_rac_nodes: {type: list, elements: dict}
       ora_db_services:
         type: list
         elements: dict

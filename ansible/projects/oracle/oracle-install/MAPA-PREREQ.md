@@ -27,7 +27,7 @@ ansible-playbook -i ../../../inventories/<amb> playbooks/<fase>.yml -e ora_hosts
 |---|---|---|
 | `restart_asm` | `oracle_restart` | 00 10 20 30 40 50 60 65 70 |
 | `si_fs` | `oracle_si` | 00 10 20 50 55 60 62 65 70 |
-| `rac_asm` | `oracle_rac` | **em construção**: 00 10 15 20 prontas, 40 escrita; 50 a 70 ainda recusam o cenário (use o comando manual) |
+| `rac_asm` | `oracle_rac` | 00 10 15 20 40 45 50 60 65 70 |
 
 ## Itens
 
@@ -46,6 +46,7 @@ ansible-playbook -i ../../../inventories/<amb> playbooks/<fase>.yml -e ora_hosts
 | Discos do ASM (persistência, dono, permissão) | 30_asmlib | ora_asmlib | `restart_asm`: ASMLib v3, partição GPT e `createdisk` por `by-id`, só em disco vazio | regras udev; discos compartilhados de RAC |
 | Discos do ASM compartilhados (RAC) | 15_rac_prep | ora_rac_prep | `rac_asm`: regra udev por WWN (`/dev/disk/by-id/wwn-*`) com `oracle:asmadmin 0660`, igual nos nós; regra nova só com disco vazio | apresentar o LUN aos nós (infra); com o ASM já em uso, qualquer mudança na regra é recusada (incluir LUN depois da instalação é manual) |
 | SSH sem senha do dono entre os nós (RAC) | 15_rac_prep | ora_rac_prep | chave RSA do `oracle` (só se ausente), `authorized_keys` e `known_hosts` com todos os nós; testa `ssh <nó> date` | — |
+| Diskgroups além do do OCR (RAC) | 45_diskgroups | ora_diskgroup | `CREATE DISKGROUP` via `sqlplus / as sysasm` no 1º nó e `srvctl start diskgroup` no cluster, só em disco vazio | redimensionar/redundância de diskgroup existente; disco com header ASM aborta (limpeza é manual) |
 | HugePages | 70_hugepages | ora_hugepages | `vm.nr_hugepages` pela SGA real, depois do banco criado | antes do banco existir |
 | Kernel e versão do SO | — | — | nada: a fase 00 só recusa o que está fora da matriz `ora_supported_os` (distribuição, release, kernel e RU mínimos) | trocar kernel |
 | RAM, swap, `/tmp`, espaço em disco | — | — | nada | infra |

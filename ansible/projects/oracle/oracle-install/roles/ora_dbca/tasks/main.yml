@@ -1,6 +1,8 @@
 ---
-# Fase 60 — criação do banco (CDB + PDB) com dbca silencioso: em ASM com Oracle Restart (restart_asm)
-# ou em filesystem sem Grid (si_fs: -storageType FS, datafileDestination, recoveryAreaDestination).
+# Fase 60 — criação do banco (CDB + PDB) com dbca silencioso: em ASM com Grid (restart_asm, rac_asm:
+# -storageType ASM, diskgroups DATA/FRA da fase 45) ou em filesystem sem Grid (si_fs: -storageType FS,
+# datafileDestination, recoveryAreaDestination). No RAC o dbca roda só no nó de instalação
+# (o 1º de ora_rac_nodes) e registra uma instância por nó (databaseConfigType=RAC, nodelist).
 # Fontes: 19c Administrator's Guide cap. 2 §2.14 "Database Configuration Assistant Command Reference
 # for Silent Mode" (createDatabase: -responseFile, -enableArchive, -recoveryAreaSize,
 # -redoLogFileSize) e cap. 4 §4.1.5 ("DBCA automatically adds the database to the Oracle Restart
@@ -9,19 +11,52 @@
 
 - name: dbca | Ambiente do banco e do ASM
   ansible.builtin.set_fact:
+    _dbca_rac: "{{ ora_install_type == 'rac_asm' }}"
+    _dbca_install_node: "{{ ora_install_type != 'rac_asm' or inventory_hostname == ora_rac_nodes[0].name }}"
+    # SID local: <db><nº do nó> no RAC (orcl1, orcl2…); o nome do banco nos demais cenários.
+    _dbca_sid: >-
+      {{ ora_db_name ~ ((ora_rac_nodes | map(attribute='name') | list).index(inventory_hostname) + 1)
+         if ora_install_type == 'rac_asm' else ora_db_name }}
+
+- name: dbca | Ambientes do banco e do ASM (usa _dbca_sid do set_fact anterior)
+  ansible.builtin.set_fact:
     _dbca_env_db:
       ORACLE_HOME: "{{ ora_db_home }}"
       ORACLE_BASE: "{{ ora_base }}"
-      ORACLE_SID: "{{ ora_db_name }}"
+      ORACLE_SID: "{{ _dbca_sid }}"
     _dbca_env_asm:
       ORACLE_HOME: "{{ ora_grid_home }}"
       ORACLE_BASE: "{{ ora_base }}"
-      ORACLE_SID: "+ASM"
+      ORACLE_SID: "+ASM{{ ((ora_rac_nodes | map(attribute='name') | list).index(inventory_hostname) + 1) if ora_install_type == 'rac_asm' else '' }}"
     # Onde os datafiles e a FRA têm de estar (pós-checagem).
-    _dbca_data_prefix: "{{ ('+' ~ ora_db_diskgroup ~ '/') if ora_install_type == 'restart_asm' else (ora_db_data_dir ~ '/') }}"
-    _dbca_fra_dest: "{{ ('+' ~ ora_db_fra_diskgroup) if ora_install_type == 'restart_asm' else ora_db_fra_dir }}"
+    _dbca_data_prefix: "{{ ('+' ~ ora_db_diskgroup ~ '/') if ora_install_type != 'si_fs' else (ora_db_data_dir ~ '/') }}"
+    _dbca_fra_dest: "{{ ('+' ~ ora_db_fra_diskgroup) if ora_install_type != 'si_fs' else ora_db_fra_dir }}"
 
 # ---------- Pré-condições (somente leitura) ----------
+- name: dbca | RAC — exatamente os nós de um cluster nesta execução
+  ansible.builtin.assert:
+    that: ora_rac_nodes | map(attribute='name') | sort == ansible_play_hosts_all | sort
+    fail_msg: >-
+      O dbca do cluster registra uma instância por nó e precisa de todos os nós deste cluster
+      ({{ ora_rac_nodes | map(attribute='name') | list }}) e só deles; nesta execução estão
+      {{ ansible_play_hosts_all }}. Use -e ora_hosts=<grupo do cluster>.
+    quiet: true
+  when: _dbca_rac | bool
+
+# O 1º diskgroup de ora_asm é o do OCR/voting (criado na fase 40); os dados vão em DATA/FRA
+# (fase 45), escolhidos no inventário — nunca no do OCR.
+- name: dbca | RAC — diskgroups do banco não são o do OCR
+  ansible.builtin.assert:
+    that:
+      - ora_db_diskgroup != ora_asm.diskgroups[0].name
+      - ora_db_fra_diskgroup != ora_asm.diskgroups[0].name
+    fail_msg: >-
+      ora_db_diskgroup/ora_db_fra_diskgroup apontam para {{ ora_asm.diskgroups[0].name }}, o
+      diskgroup do OCR/voting. No rac_asm, defina no inventário os diskgroups do banco (ex.: DATA e
+      FRA, criados na fase 45).
+    quiet: true
+  when: _dbca_rac | bool
+
 # O rsp com senha fica em /tmp e é apagado no always a partir do controller; se o controller morre,
 # a próxima execução o remove antes de qualquer checagem que possa abortar (como na fase 40).
 - name: dbca | Response files de execuções interrompidas
@@ -60,7 +95,7 @@
   failed_when: _dbca_oratab.rc > 1
   check_mode: false
 
-- name: dbca | Banco no Oracle Restart
+- name: dbca | Banco registrado no Clusterware/Restart
   ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl config database -db {{ ora_db_name }}"
   environment: "{{ _dbca_env_db }}"
   become: true
@@ -69,12 +104,13 @@
   changed_when: false
   failed_when: false
   check_mode: false
-  when: ora_install_type == 'restart_asm'
+  when: ora_install_type != 'si_fs'
 
 # Pela linha de comando: o Oracle grava o comm em minúsculas (ora_pmon_orcl), e pgrep -x usa o comm.
+# No RAC a instância local é <db><nº>: casa por prefixo (ora_pmon_orcl1).
 - name: dbca | Instância no ar
   ansible.builtin.command:
-    argv: [pgrep, -f, "^ora_pmon_{{ ora_db_name }}( |$)"]
+    argv: [pgrep, -f, "^ora_pmon_{{ ora_db_name }}{{ '( |$)' if ora_install_type != 'rac_asm' else '' }}"]
   register: _dbca_pmon
   changed_when: false
   failed_when: false
@@ -89,7 +125,7 @@
   changed_when: false
   failed_when: false
   check_mode: false
-  when: ora_install_type == 'restart_asm'
+  when: ora_install_type != 'si_fs'
 
 # si_fs: o dbca grava os arquivos em <datafileDestination>/<DB_UNIQUE_NAME>.
 - name: dbca | Arquivos do banco no filesystem
@@ -138,14 +174,14 @@
     fail_msg: "{{ ora_db_home }}/bin/dbca não existe: rode a fase 50."
     quiet: true
 
-- name: dbca | Diskgroups montados no Restart
+- name: dbca | Diskgroups montados no cluster/Restart
   ansible.builtin.command: "{{ ora_grid_home }}/bin/crsctl stat res ora.{{ item }}.dg"
   loop: "{{ [ora_db_diskgroup, ora_db_fra_diskgroup] | unique }}"
   register: _dbca_dg
   changed_when: false
   check_mode: false
   failed_when: _dbca_dg.rc != 0 or 'STATE=ONLINE' not in _dbca_dg.stdout
-  when: ora_install_type == 'restart_asm'
+  when: ora_install_type != 'si_fs'
 
 - name: dbca | Diretórios dos datafiles e da FRA (fase 10)
   ansible.builtin.stat:
@@ -176,7 +212,8 @@
   when: ansible_check_mode
 
 # ---------- Criação ----------
-- name: dbca | Criação do banco
+- name: dbca | Criação do banco (só no nó de instalação)
+  when: _dbca_install_node | bool
   block:
     - name: dbca | Diretório temporário do response file
       ansible.builtin.tempfile:
@@ -235,7 +272,7 @@
       when: _dbca_tmp.path is defined
 
 # ---------- Pós-checagem ----------
-- name: dbca | Registro no Oracle Restart
+- name: dbca | Registro no Clusterware/Restart
   ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl status database -db {{ ora_db_name }}"
   environment: "{{ _dbca_env_db }}"
   become: true
@@ -243,7 +280,7 @@
   register: _dbca_status
   changed_when: false
   failed_when: _dbca_status.rc != 0 or 'is running' not in _dbca_status.stdout
-  when: ora_install_type == 'restart_asm'
+  when: ora_install_type != 'si_fs'
 
 - name: dbca | Instância aberta (si_fs, sem Restart)
   ansible.builtin.command:

@@ -1,6 +1,7 @@
 # Desenho: cenário `rac_asm` (RAC 19c, 2 nós, ASM por udev)
 
-Estado: **em construção**. Prontas e testadas no lab: fases 00, 10 e 15. As demais ainda recusam o `rac_asm`.
+Estado: **implementado** nas fases 00 a 70 (45 nova; 50, 60, 65 e 70 com ramo RAC; validado no
+cluster orclrac do lab, RU 19.33).
 Exemplos com os nomes do inventário modelo (`inventories/example`, cluster `rac_cluster01`); valores fictícios.
 
 ## 1. O que o cenário instala
@@ -16,7 +17,7 @@ RU **19.30** (GIRU 38629535) nos dois homes, mais o one-off **38609069**. Dono �
 | 20 stage | igual, só no nó de instalação | `srvrac01` |
 | 30 asmlib | **não entra** (a regra udev da 15 substitui) | — |
 | 40 grid | ramo `CRS_CONFIG` | instalador em `srvrac01`; `root.sh` em série, `srvrac01` e depois `srvrac02` |
-| 45 diskgroups (nova ou ramo da 40) | `+FRA` e `+DATA` com `asmca -silent` | `srvrac01` |
+| 45 diskgroups (nova) | `+FRA` e `+DATA` com `CREATE DISKGROUP` via `sqlplus / as sysasm` + `srvctl start` | `srvrac01` |
 | 50 db_software | ramo RAC (`-applyRU <GIRU>`, `CLUSTER_NODES`) | instalador em `srvrac01`; `root.sh` em série |
 | 60 dbca | ramo RAC (`databaseConfigType=RAC`, `nodelist`) | `srvrac01` |
 | 65 db_service | `srvctl add service -preferred <inst1>,<inst2>` | `srvrac01` |

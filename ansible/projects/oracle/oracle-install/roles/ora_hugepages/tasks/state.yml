@@ -32,7 +32,7 @@
   ansible.builtin.shell: |
     set -o pipefail
     hp_bytes=$(( $(awk '/^Hugepagesize:/{print $2}' /proc/meminfo) * 1024 ))
-    ids=$({{ ora_db_home }}/bin/sysresv -l {{ ora_db_name }} \
+    ids=$({{ ora_db_home }}/bin/sysresv -l {{ _hp_sid | default(ora_db_name) }} \
           | awk '/^Shared Memory:/{f=1;next} /^Semaphores:/{f=0} f && $1 ~ /^[0-9]+$/ {print $1}')
     [ -n "$ids" ] || { echo "sysresv não listou segmentos de {{ ora_db_name }}" >&2; exit 1; }
     ipcs -m | awk -v ids="$ids" -v hp="$hp_bytes" \

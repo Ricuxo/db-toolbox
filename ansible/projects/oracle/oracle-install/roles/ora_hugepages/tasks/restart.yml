@@ -2,6 +2,8 @@
 # Reinício do banco.
 # restart_asm: pelo Oracle Restart (19c Admin Guide cap. 4: srvctl stop/start database); os serviços
 #   com policy AUTOMATIC sobem junto e reabrem as PDBs (fase 65).
+# rac_asm: instância por instância, neste nó (srvctl stop/start instance -node); o playbook é
+#   serial: 1, então cada nó reinicia a sua de cada vez e o cluster segue atendendo.
 # si_fs: sem Restart, SHUTDOWN IMMEDIATE e STARTUP no SQL*Plus (os comandos do próprio dbshut/dbstart);
 #   a PDB reabre pelo SAVE STATE (fase 65). O state.yml em seguida falha se a instância não subir.
 - name: HugePages | Parar o banco ({{ _hp_reason }})
@@ -17,6 +19,23 @@
   become: true
   become_user: "{{ ora_owner }}"
   when: ora_install_type == 'restart_asm'
+
+# -force: sem ele o CRS recusa parar a instância quando um serviço criado na fase 65 roda nela
+# (CRS-2974: "require stopping or relocating resource ora.<db>.<svc>.svc").
+- name: HugePages | Parar a instância deste nó ({{ _hp_reason }}, RAC)
+  ansible.builtin.command:
+    "{{ ora_db_home }}/bin/srvctl stop instance -db {{ ora_db_name }} -node {{ inventory_hostname }} -stopoption IMMEDIATE -force"
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  when: ora_install_type == 'rac_asm'
+
+- name: HugePages | Subir a instância deste nó (RAC)
+  ansible.builtin.command: "{{ ora_db_home }}/bin/srvctl start instance -db {{ ora_db_name }} -node {{ inventory_hostname }}"
+  environment: "{{ _hp_env }}"
+  become: true
+  become_user: "{{ ora_owner }}"
+  when: ora_install_type == 'rac_asm'
 
 - name: HugePages | Parar e subir o banco pelo SQL*Plus ({{ _hp_reason }}, si_fs)
   ansible.builtin.command:

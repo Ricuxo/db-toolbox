@@ -1,11 +1,16 @@
 ---
 argument_specs:
   main:
-    short_description: Instala o software Oracle Database 19c (só software) num servidor com Oracle Restart.
+    short_description: Instala o software Oracle Database 19c (só software).
     description:
-      - runInstaller silencioso com -applyRU (GIRU) e -applyOneOffs; nunca -ignorePrereq.
-      - Exige o Grid (Restart) instalado; aborta com instalador rodando, DB home no inventário ou
-        patch desta instalação já aplicado no home.
+      - runInstaller silencioso com -applyRU (GIRU com Grid; DB RU em si_fs) e -applyOneOffs; nunca
+        -ignorePrereq.
+      - Exige o Grid (Restart ou RAC) instalado nos cenários com ASM; aborta com instalador rodando,
+        DB home instalado ou patch desta instalação já aplicado num home não preparado.
+      - "Retoma execução interrompida: home preparado (RU aplicada, sem registro) roda sem -applyRU;
+        home registrado sem /etc/oratab segue direto para os root.sh."
+      - "No RAC, o runInstaller roda só no 1º nó de ora_rac_nodes (CLUSTER_NODES no rsp); root.sh
+        roda em todos, um nó por vez."
       - Apaga response files de execuções interrompidas (/tmp/ora_db_sw_*) antes de começar.
       - Response file 0600, dono oracle, apagado ao fim.
     options:
@@ -19,6 +24,7 @@ argument_specs:
       ora_stage_patch_dir: {type: path, required: true}
       ora_media: {type: dict, required: true}
       ora_db_home: {type: path}
+      ora_rac_nodes: {type: list, elements: dict}
       ora_db_edition: {type: str, choices: [EE, SE2]}
       ora_db_osdba: {type: str}
       ora_db_osoper: {type: str}

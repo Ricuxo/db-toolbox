@@ -19,6 +19,9 @@
 - name: Fase 40 — Grid Infrastructure (Restart ou RAC)
   ansible.builtin.import_playbook: 40_grid.yml
 
+- name: Fase 45 — diskgroups do ASM além do OCR (só rac_asm)
+  ansible.builtin.import_playbook: 45_diskgroups.yml
+
 - name: Fase 50 — software do Oracle Database
   ansible.builtin.import_playbook: 50_db_software.yml
 

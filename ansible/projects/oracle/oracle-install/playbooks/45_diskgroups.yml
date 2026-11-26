@@ -1,0 +1,17 @@
+---
+# Fase 45 — diskgroups do ASM além do do OCR (só rac_asm). Precisa da fase 40.
+# Roda em todos os nós de uma vez; a criação acontece só no nó de instalação.
+- name: ASM — diskgroups
+  hosts: "{{ ora_hosts | default('oracle') }}:&oracle_rac"
+  gather_facts: false
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Guarda de ambiente
+      ansible.builtin.import_role:
+        name: ora_env
+      tags: [always]
+      vars:
+        ora_env_phase_types: [rac_asm]
+  roles:
+    - role: ora_diskgroup
+      tags: [diskgroup]

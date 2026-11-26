@@ -1,16 +1,23 @@
 ---
 # Fase 50 — software Oracle Database 19c (INSTALL_DB_SWONLY).
 # Fontes: 19c rnrdm "Installing Oracle Database 19c (19.32) on Oracle Linux 9 and RHEL 9": banco em
-# ASM com Restart (restart_asm) usa runInstaller -applyRU <GIRU>; "Single-instance Oracle Database
+# ASM (restart_asm, rac_asm) usa runInstaller -applyRU <GIRU>; "Single-instance Oracle Database
 # (19.32)" (si_fs, sem Grid) usa -applyRU <DBRU>; os dois com -applyOneOffs ...; 19c ladbi "Installing the Oracle
 # Database Software" ("Run the runInstaller command from the Oracle home directory only"), "Running
 # Oracle Universal Installer Using a Response File" (-silent, caminho absoluto, root.sh como root) e
 # "Preparing Response Files" (dono do instalador, 600).
 # Sem bypass: nunca -ignorePrereq(Failure). O gate é a checagem do próprio runInstaller.
+# No RAC o runInstaller roda só no nó de instalação (o 1º de ora_rac_nodes) e copia o home para os
+# outros (CLUSTER_NODES no rsp); root.sh roda em todos, um nó por vez, na ordem de ora_rac_nodes.
 
-- name: DB software | Caminhos da RU (GIRU em restart_asm, DB RU em si_fs) e dos one-offs no stage
+- name: DB software | Nó de instalação (o 1º de ora_rac_nodes) no RAC
+  ansible.builtin.set_fact:
+    _dbsw_rac: "{{ ora_install_type == 'rac_asm' }}"
+    _dbsw_install_node: "{{ ora_install_type != 'rac_asm' or inventory_hostname == ora_rac_nodes[0].name }}"
+
+- name: DB software | Caminhos da RU (GIRU com Grid, DB RU em si_fs) e dos one-offs no stage
   vars:
-    _ru: "{{ ora_media.ru_grid if ora_install_type == 'restart_asm' else ora_media.ru_db }}"
+    _ru: "{{ ora_media.ru_grid if ora_install_type in ['restart_asm', 'rac_asm'] else ora_media.ru_db }}"
   ansible.builtin.set_fact:
     _dbsw_ru_dir: "{{ ora_stage_patch_dir }}/{{ _ru.patchid }}/{{ _ru.patchid }}"
     _dbsw_oneoff_dirs: >-
@@ -18,6 +25,16 @@
          | map('regex_replace', '^(.*)$', ora_stage_patch_dir ~ '/\1/\1') | list }}
 
 # ---------- Pré-condições (somente leitura) ----------
+- name: DB software | RAC — exatamente os nós de um cluster nesta execução
+  ansible.builtin.assert:
+    that: ora_rac_nodes | map(attribute='name') | sort == ansible_play_hosts_all | sort
+    fail_msg: >-
+      O runInstaller do cluster e os root.sh precisam de todos os nós deste cluster
+      ({{ ora_rac_nodes | map(attribute='name') | list }}) e só deles; nesta execução estão
+      {{ ansible_play_hosts_all }}. Use -e ora_hosts=<grupo do cluster>.
+    quiet: true
+  when: _dbsw_rac | bool
+
 # O rsp fica em /tmp e é apagado no always a partir do controller; se o controller morre no meio,
 # a próxima execução o remove antes de qualquer checagem que possa abortar (como na fase 40).
 - name: DB software | Response files de execuções interrompidas
@@ -42,18 +59,18 @@
 
 # ladbi "Installing the Oracle Database Software": "If you plan to use Oracle Restart or Oracle ASM,
 # then you must install Oracle Grid Infrastructure for a standalone server before you install and
-# create the database."
-- name: DB software | Oracle Restart instalado (fase 40)
+# create the database." No RAC, o olr.loc vale do Grid do cluster (fase 40).
+- name: DB software | Oracle Restart ou Grid instalado (fase 40)
   ansible.builtin.stat:
     path: /etc/oracle/olr.loc
   register: _dbsw_olr
 
-- name: DB software | Restart presente só no cenário que o usa
+- name: DB software | Grid presente só no cenário que o usa
   ansible.builtin.assert:
-    that: _dbsw_olr.stat.exists == (ora_install_type == 'restart_asm')
+    that: _dbsw_olr.stat.exists == (ora_install_type in ['restart_asm', 'rac_asm'])
     fail_msg: >-
       {{ '/etc/oracle/olr.loc não existe: instale o Grid (fase 40) antes do software do banco.'
-         if ora_install_type == 'restart_asm' else
+         if ora_install_type in ['restart_asm', 'rac_asm'] else
          'Há Grid/Restart neste servidor (/etc/oracle/olr.loc), mas o cenário é si_fs (sem Grid). '
          ~ 'Confira o grupo do host no inventário.' }}
     quiet: true
@@ -107,11 +124,59 @@
   register: _dbsw_applied
   when: _dbsw_ps.stat.isdir | default(false)
 
+# Estado do DB home, como na fase 40:
+#   _dbsw_prepared    — sub-patches da RU/one-offs aplicados, home ainda fora do inventário:
+#                       execução anterior parou depois do -applyRU; o runInstaller roda sem ele.
+#   _dbsw_home_registered — home no inventory.xml: o runInstaller SWONLY terminou. Se falta a marca
+#                       da role (.ora_db_rootsh_done, tocada depois de cada root.sh), a retomada
+#                       segue só com os root.sh. (O /etc/oratab não serve: o root.sh do Grid já o cria.)
+#   _dbsw_installed   — registrado e com a marca: instalado; a fase recusa.
+- name: DB software | Marcas de instalação concluída
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /etc/oracle/.ora_db_rootsh_done          # tocada pela role depois de cada root.sh
+  register: _dbsw_signs
+
+- name: DB software | Estado do DB home (preparado, registrado, instalado)
+  ansible.builtin.set_fact:
+    _dbsw_home_registered: "{{ _dbsw_in_inventory.rc | default(1) == 0 }}"
+    _dbsw_installed: >-
+      {{ (_dbsw_in_inventory.rc | default(1)) == 0
+         and _dbsw_signs.results | selectattr('stat.exists') | list | length == _dbsw_signs.results | length }}
+    _dbsw_prepared: >-
+      {{ (_dbsw_in_inventory.rc | default(1)) != 0 and (_dbsw_applied.files | default([]) | length > 0) }}
+
+# RAC: home remoto não vazio só é aceito quando o nó de instalação já registrou o home (o
+# runInstaller o copia para os outros nós). Fora isso, é sobra de tentativa anterior.
+- name: DB software | RAC — DB home existe nos outros nós?
+  ansible.builtin.stat:
+    path: "{{ ora_db_home }}"
+  register: _dbsw_remote_dir
+  when:
+    - _dbsw_rac | bool
+    - not _dbsw_install_node | bool
+
+- name: DB software | RAC — conteúdo do DB home nos outros nós
+  ansible.builtin.find:
+    paths: "{{ ora_db_home }}"
+  register: _dbsw_remote_home
+  when:
+    - _dbsw_rac | bool
+    - not _dbsw_install_node | bool
+    - _dbsw_remote_dir.stat.isdir | default(false)
+
 - name: DB software | Abortar se o DB home não estiver limpo
   vars:
+    _home_registered_here: >-
+      {{ _dbsw_home_registered if not _dbsw_rac else
+         (hostvars[ora_rac_nodes[0].name]._dbsw_home_registered | default(false)) }}
     _found: >-
-      {{ (['inventory.xml registra ' ~ ora_db_home] if _dbsw_in_inventory.rc | default(1) == 0 else [])
-         + (_dbsw_applied.files | default([]) | map(attribute='path') | list) }}
+      {{ (['inventory.xml registra ' ~ ora_db_home ~ ' (instalado)'] if _dbsw_installed | bool else [])
+         + ([] if (_dbsw_prepared or _dbsw_home_registered) | default(false) | bool else
+            (_dbsw_applied.files | default([]) | map(attribute='path') | list))
+         + ([ora_db_home ~ ' (não vazio)']
+            if (_dbsw_remote_home.matched | default(0)) > 0 and not (_home_registered_here | bool) else []) }}
   ansible.builtin.assert:
     that:
       - _dbsw_running.rc != 0
@@ -125,22 +190,39 @@
          if _found else '' }}
     quiet: true
 
+- name: DB software | Retomada — home já preparado com a RU
+  ansible.builtin.debug:
+    msg: >-
+      RU e one-offs já aplicados em {{ ora_db_home }} (execução anterior parou depois do
+      -applyRU). Retomando: o runInstaller roda sem -applyRU/-applyOneOffs.
+  when: (_dbsw_prepared | default(false) | bool) and not (_dbsw_home_registered | default(false) | bool)
+
+- name: DB software | Retomada — software instalado, root.sh pendente
+  ansible.builtin.debug:
+    msg: >-
+      DB home registrado no inventário e root.sh pendente em {{ inventory_hostname }}. Retomando:
+      sem runInstaller; segue com orainstRoot.sh e root.sh.
+  when: (_dbsw_home_registered | default(false) | bool) and not (_dbsw_installed | bool)
+
 - name: DB software | Mídia íntegra no stage
   ansible.builtin.include_role:
     name: ora_stage
     tasks_from: verify
+  when: _dbsw_install_node | bool
 
 - name: DB software | RU e one-offs extraídos (fase 20)
   ansible.builtin.stat:
     path: "{{ item }}"
   loop: "{{ [_dbsw_ru_dir] + _dbsw_oneoff_dirs }}"
   register: _dbsw_patch_dirs
+  when: _dbsw_install_node | bool
 
 - name: DB software | Falta extrair patch
   ansible.builtin.assert:
     that: _dbsw_patch_dirs.results | rejectattr('stat.exists') | list | length == 0
     fail_msg: "Patch não extraído: {{ _dbsw_patch_dirs.results | rejectattr('stat.exists') | map(attribute='item') | list }}. Rode a fase 20."
     quiet: true
+  when: _dbsw_install_node | bool
 
 # Descompactar e instalar não têm como ser simulados (o home ainda não existe); em --check a fase
 # termina aqui, depois das pré-condições.
@@ -149,45 +231,51 @@
   when: ansible_check_mode
 
 # ---------- Software ----------
-- name: DB software | DB home
+- name: DB software | DB home e diretórios pais
   ansible.builtin.file:
-    path: "{{ ora_db_home }}"
+    path: "{{ item }}"
     state: directory
     owner: "{{ ora_owner }}"
     group: "{{ ora_install_group }}"
     mode: "0775"
+  loop:
+    - "{{ ora_db_home | dirname }}"
+    - "{{ ora_db_home }}"
 
-- name: DB software | Descompactar a mídia 19.3 no DB home
-  ansible.builtin.unarchive:
-    src: "{{ ora_stage_dir }}/{{ ora_media.db_base.file }}"
-    dest: "{{ ora_db_home }}"
-    remote_src: true
-    creates: "{{ ora_db_home }}/runInstaller"
-  become: true
-  become_user: "{{ ora_owner }}"
+- name: DB software | Software só no nó de instalação
+  when: _dbsw_install_node | bool
+  block:
+    - name: DB software | Descompactar a mídia 19.3 no DB home
+      ansible.builtin.unarchive:
+        src: "{{ ora_stage_dir }}/{{ ora_media.db_base.file }}"
+        dest: "{{ ora_db_home }}"
+        remote_src: true
+        creates: "{{ ora_db_home }}/runInstaller"
+      become: true
+      become_user: "{{ ora_owner }}"
 
-- name: DB software | Versão do OPatch no DB home
-  ansible.builtin.command: grep -oP '(?<=OPATCH_VERSION:)\S+' {{ ora_db_home }}/OPatch/version.txt
-  register: _dbsw_opatch
-  changed_when: false
-  check_mode: false
+    - name: DB software | Versão do OPatch no DB home
+      ansible.builtin.command: grep -oP '(?<=OPATCH_VERSION:)\S+' {{ ora_db_home }}/OPatch/version.txt
+      register: _dbsw_opatch
+      changed_when: false
+      check_mode: false
 
-- name: DB software | Guardar o OPatch antigo (abaixo de {{ ora_db_opatch_min }})
-  ansible.builtin.command:
-    argv: [mv, -n, "{{ ora_db_home }}/OPatch", "{{ ora_db_home }}/OPatch.{{ _dbsw_opatch.stdout }}"]
-    creates: "{{ ora_db_home }}/OPatch.{{ _dbsw_opatch.stdout }}"
-  become: true
-  become_user: "{{ ora_owner }}"
-  when: _dbsw_opatch.stdout is version(ora_db_opatch_min, '<')
+    - name: DB software | Guardar o OPatch antigo (abaixo de {{ ora_db_opatch_min }})
+      ansible.builtin.command:
+        argv: [mv, -n, "{{ ora_db_home }}/OPatch", "{{ ora_db_home }}/OPatch.{{ _dbsw_opatch.stdout }}"]
+        creates: "{{ ora_db_home }}/OPatch.{{ _dbsw_opatch.stdout }}"
+      become: true
+      become_user: "{{ ora_owner }}"
+      when: _dbsw_opatch.stdout is version(ora_db_opatch_min, '<')
 
-- name: DB software | Instalar o OPatch do stage
-  ansible.builtin.unarchive:
-    src: "{{ ora_stage_dir }}/{{ ora_media.opatch.file }}"
-    dest: "{{ ora_db_home }}"
-    remote_src: true
-    creates: "{{ ora_db_home }}/OPatch/opatch"
-  become: true
-  become_user: "{{ ora_owner }}"
+    - name: DB software | Instalar o OPatch do stage
+      ansible.builtin.unarchive:
+        src: "{{ ora_stage_dir }}/{{ ora_media.opatch.file }}"
+        dest: "{{ ora_db_home }}"
+        remote_src: true
+        creates: "{{ ora_db_home }}/OPatch/opatch"
+      become: true
+      become_user: "{{ ora_owner }}"
 
 # ---------- Instalação ----------
 - name: DB software | Instalação
@@ -197,6 +285,7 @@
         state: directory
         prefix: ora_db_sw_
       register: _dbsw_tmp
+      when: _dbsw_install_node | bool
 
     - name: DB software | Diretório temporário só do dono
       ansible.builtin.file:
@@ -204,6 +293,7 @@
         owner: "{{ ora_owner }}"
         group: "{{ ora_install_group }}"
         mode: "0700"
+      when: _dbsw_install_node | bool
 
     - name: DB software | Response file (0600, dono {{ ora_owner }})
       ansible.builtin.template:
@@ -212,20 +302,23 @@
         owner: "{{ ora_owner }}"
         group: "{{ ora_install_group }}"
         mode: "0600"
+      when: _dbsw_install_node | bool
 
     - name: DB software | runInstaller -silent -applyRU -applyOneOffs (pode levar mais de 1 h)
       ansible.builtin.command:
         argv: >-
           {{ [ora_db_home ~ '/runInstaller', '-silent',
-              '-responseFile', _dbsw_tmp.path ~ '/db_install.rsp',
-              '-applyRU', _dbsw_ru_dir]
-             + (['-applyOneOffs', _dbsw_oneoff_dirs | join(',')] if _dbsw_oneoff_dirs else []) }}
+              '-responseFile', _dbsw_tmp.path ~ '/db_install.rsp']
+             + (['-applyRU', _dbsw_ru_dir] if not (_dbsw_prepared | default(false)) else [])
+             + (['-applyOneOffs', _dbsw_oneoff_dirs | join(',')]
+                if _dbsw_oneoff_dirs and not (_dbsw_prepared | default(false)) else []) }}
         chdir: "{{ ora_db_home }}"
       become: true
       become_user: "{{ ora_owner }}"
       async: 10800
       poll: 60
       register: _dbsw_setup
+      when: (_dbsw_install_node | bool) and not (_dbsw_home_registered | bool)
       # rc 6 = instalado com aviso(s). Só passa se TODOS os avisos estiverem em
       # ora_db_accept_warnings (vazio por padrão: qualquer aviso para a fase).
       failed_when: >-
@@ -237,20 +330,62 @@
 
     # ladbi 19c "Running Oracle Universal Installer Using a Response File": "If this is the first
     # time you are installing Oracle software on your system, then Oracle Universal Installer prompts
-    # you to run the orainstRoot.sh script." Em si_fs o banco é o primeiro produto; em restart_asm a
+    # you to run the orainstRoot.sh script." Em si_fs o banco é o primeiro produto; com Grid a
     # fase 40 já rodou (o /etc/oraInst.loc existe e a task não faz nada).
     - name: DB software | orainstRoot.sh (primeiro inventário do servidor)
       ansible.builtin.command: "{{ ora_inventory_dir }}/orainstRoot.sh"
       args:
         creates: /etc/oraInst.loc
         removes: "{{ ora_inventory_dir }}/orainstRoot.sh"
+      when: not _dbsw_rac | bool
 
-    # Só roda logo depois do runInstaller desta execução: numa 2ª execução a fase aborta antes.
+    # Só roda logo depois do runInstaller desta execução (ou na retomada com home registrado):
+    # instalado de verdade, a fase aborta antes.
     - name: DB software | root.sh
       ansible.builtin.command: "{{ ora_db_home }}/root.sh"
       register: _dbsw_root
       async: 1800
       poll: 30
+      when: not _dbsw_rac | bool
+
+    - name: DB software | Marca de root.sh concluído
+      ansible.builtin.file:
+        path: /etc/oracle/.ora_db_rootsh_done
+        state: touch
+        mode: "0644"
+      when: not _dbsw_rac | bool
+
+    # RAC: um nó por vez, na ordem de ora_rac_nodes (o nó de instalação primeiro), e não na ordem dos
+    # hosts do play, que o Ansible não garante — como na fase 40.
+    - name: DB software | RAC — orainstRoot.sh, nó a nó
+      ansible.builtin.command: "{{ ora_inventory_dir }}/orainstRoot.sh"
+      args:
+        creates: /etc/oraInst.loc
+        removes: "{{ ora_inventory_dir }}/orainstRoot.sh"
+      delegate_to: "{{ item }}"
+      run_once: true
+      loop: "{{ ora_rac_nodes | map(attribute='name') | list }}"
+      when: _dbsw_rac | bool
+
+    - name: DB software | RAC — root.sh, nó a nó
+      ansible.builtin.command: "{{ ora_db_home }}/root.sh"
+      register: _dbsw_root
+      async: 1800
+      poll: 30
+      delegate_to: "{{ item }}"
+      run_once: true
+      loop: "{{ ora_rac_nodes | map(attribute='name') | list }}"
+      when: _dbsw_rac | bool
+
+    - name: DB software | RAC — marca de root.sh concluído, nó a nó
+      ansible.builtin.file:
+        path: /etc/oracle/.ora_db_rootsh_done
+        state: touch
+        mode: "0644"
+      delegate_to: "{{ item }}"
+      run_once: true
+      loop: "{{ ora_rac_nodes | map(attribute='name') | list }}"
+      when: _dbsw_rac | bool
 
   always:
     - name: DB software | Apagar o response file
@@ -260,8 +395,10 @@
       when: _dbsw_tmp.path is defined
 
 # ---------- Pós-checagem ----------
-# No DB home, a GIRU (restart_asm) aplica o sub-patch do banco (ru_db) entre outros, e a DB RU (si_fs)
-# é o próprio ru_db; confere-se o que o catálogo identifica sem suposição: a DB RU e cada one-off.
+# No DB home, a GIRU (restart_asm, rac_asm) aplica o sub-patch do banco (ru_db) entre outros, e a
+# DB RU (si_fs) é o próprio ru_db; confere-se o que o catálogo identifica sem suposição: a DB RU e
+# cada one-off. A 19.33 não tem ru_db no catálogo (o rac_asm aplica a GIRU): a checagem fica só nos
+# one-offs e em lspatches não vazio — NÃO VERIFICADO qual sub-patch a GIRU marca no DB home.
 - name: DB software | Patches no DB home
   ansible.builtin.command: "{{ ora_db_home }}/OPatch/opatch lspatches"
   become: true
@@ -270,8 +407,10 @@
   changed_when: false
   failed_when: >-
     _dbsw_lspatches.rc != 0 or
-    ([ora_media.ru_db.patchid] + (ora_media.oneoffs | default([]) | map(attribute='patchid') | list))
-    | difference(_dbsw_lspatches.stdout | regex_findall('(?m)^([0-9]+);')) | length > 0
+    ((([ora_media.ru_db.patchid] if ora_media.ru_db is defined else [])
+      + (ora_media.oneoffs | default([]) | map(attribute='patchid') | list))
+     | difference(_dbsw_lspatches.stdout | regex_findall('(?m)^([0-9]+);')) | length > 0) or
+    (ora_media.ru_db is not defined and _dbsw_lspatches.stdout | regex_findall('(?m)^[0-9]+;') | length == 0)
 
 - name: DB software | Resumo
   ansible.builtin.debug:

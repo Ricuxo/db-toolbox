@@ -1,10 +1,12 @@
 ---
 # Fase 70 — HugePages para o SGA e USE_LARGE_PAGES. Precisa das fases 60 e 65.
-# ATENÇÃO: reinicia o banco (srvctl) quando há mudança. Em servidor em uso, só em janela.
+# ATENÇÃO: reinicia o banco (srvctl) quando há mudança — no RAC, uma instância por vez (serial: 1).
+# Em servidor em uso, só em janela.
 - name: Oracle Database — HugePages
-  hosts: "{{ ora_hosts | default('oracle:!oracle_rac') }}"   # rac_asm: fase ainda não implementada
+  hosts: "{{ ora_hosts | default('oracle') }}"
   gather_facts: true
   any_errors_fatal: true
+  serial: 1                         # RAC: reinicia a instância de um nó por vez
   pre_tasks:
     - name: Guarda de ambiente
       ansible.builtin.import_role:
@@ -12,6 +14,7 @@
       tags: [always]                # roda mesmo com --tags/--skip-tags
       vars:
         ora_env_confirm: true       # reinicia o banco: em prod exige -e ora_confirm_env=prod
+        ora_env_phase_types: [restart_asm, si_fs, rac_asm]
   roles:
     - role: ora_hugepages
       tags: [hugepages]

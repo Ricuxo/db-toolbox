@@ -8,14 +8,13 @@ kernel e a RU mínimos da linha) · dono único `oracle`**, em três cenários:
 |---|---|---|---|
 | `restart_asm` | `oracle_restart` | Oracle Restart (Grid standalone) + ASM (ASMLib v3); banco em ASM; GIRU nos dois homes | 00 10 20 30 40 50 60 65 70 |
 | `si_fs` | `oracle_si` | Só o banco (Single Instance, sem Grid) em filesystem; DB RU; listener do home; início no boot por `dbstart`/`dbora` | 00 10 20 50 55 60 62 65 70 |
-| `rac_asm` | `oracle_rac` | RAC: Grid Infrastructure for a Cluster + ASM com discos por regra udev (WWN), sem ASMLib; RU escolhida por cluster (`ora_ru` em `group_vars/<cluster>`). **Em construção** (desenho em `DESENHO-RAC.md`) | prontas: 00 10 15 20; 40 escrita |
+| `rac_asm` | `oracle_rac` | RAC: Grid Infrastructure for a Cluster + ASM com discos por regra udev (WWN), sem ASMLib; banco RAC em ASM; RU escolhida por cluster (`ora_ru` em `group_vars/<cluster>`) | 00 10 15 20 40 45 50 60 65 70 |
 
 **O cenário vem do grupo do host no inventário** (`group_vars/<grupo>/main.yml` define
 `ora_install_type`), do mesmo jeito que o ambiente vem do `-i`. As fases comuns miram no grupo
-`oracle`. As de um cenário só (15 no RAC, 30 no Restart, 55 e 62 no SI) e a 40 (Restart e RAC) ficam só
+`oracle`. As de um cenário só (15 e 45 no RAC, 30 no Restart, 55 e 62 no SI) e a 40 (Restart e RAC) ficam só
 com os hosts do grupo delas: com outro alvo, a fase é pulada ("no hosts matched"), e é isso que deixa o
-`site.yml` rodar em qualquer cenário. As fases que ainda não tratam o `rac_asm` (50 a 70) recusam o
-host RAC na guarda de ambiente (`ora_env_phase_types`).
+`site.yml` rodar em qualquer cenário.
 
 ## Princípios
 
@@ -53,12 +52,13 @@ host RAC na guarda de ambiente (`ora_env_phase_types`).
 | 6 | `playbooks/20_stage.yml` — recolhe a mídia (se configurado), verifica (presença pelo nome) e descompacta RU e one-offs |
 | 7 | `playbooks/30_asmlib.yml` — ASMLib v3 (`ol9_addons` + `oracleasmlib` do stage, `rpm -K`), partição GPT e `createdisk` (só disco vazio por `by-id`) |
 | 8 | `playbooks/40_grid.yml` — Grid/Restart: Grid home, OPatch, `cvuqdisk` da mídia, `gridSetup.sh -silent -applyRU -applyOneOffs` (gate: pré-requisitos integrados, já com a RU; rc 6 só passa com avisos listados em `ora_grid_accept_warnings`), `root.sh`, `-executeConfigTools` |
-| 9 | `playbooks/50_db_software.yml` — software do banco (só software) no `dbhome_1`: OPatch, `runInstaller -silent -applyRU <GIRU> -applyOneOffs` (banco em ASM com Restart usa a GIRU, página 19.32 das Release Notes; rc 6 só com avisos em `ora_db_accept_warnings`), `root.sh`; confere DB RU e one-offs no `opatch lspatches` | **Em `si_fs`**: `-applyRU <DBRU>` (página 19.32, "Single-instance Oracle Database"), sem exigir o Restart.
+| 8a | `playbooks/45_diskgroups.yml` — **só `rac_asm`**: `CREATE DISKGROUP` via `sqlplus / as sysasm` no 1º nó para os diskgroups de `ora_asm` além do do OCR (Storage Admin Guide 19c; só disco vazio, por `by-id`), e `srvctl start diskgroup` para montar no cluster; confere `v$asm_diskgroup`/`gv$asm_diskgroup` em todos os nós; idempotente |
+| 9 | `playbooks/50_db_software.yml` — software do banco (só software) no `dbhome_1`: OPatch, `runInstaller -silent -applyRU <GIRU> -applyOneOffs` (banco em ASM com Restart usa a GIRU, página 19.32 das Release Notes; rc 6 só com avisos em `ora_db_accept_warnings`), `root.sh`; confere DB RU e one-offs no `opatch lspatches` | **Em `si_fs`**: `-applyRU <DBRU>` (página 19.32, "Single-instance Oracle Database"), sem exigir o Restart. **No RAC**: `CLUSTER_NODES` no rsp, `runInstaller` só no 1º nó (copia o home para os demais) e `root.sh` nó a nó; retoma execução interrompida (home preparado sem registro → sem `-applyRU`; registrado sem `/etc/oratab` → só root.sh).
 | 9a | `playbooks/55_listener.yml` — **só `si_fs`**: listener do DB home com `netca -silent -responsefile` e o template `assistants/netca/netca.rsp` do próprio home (LISTENER, TCP 1521; ladbi "Running Configuration Assistants Using Response Files"); recusa a 1521 ocupada por outro processo |
-| 10 | `playbooks/60_dbca.yml` — `dbca -silent -createDatabase` (rsp do template oficial, senhas do vault, 0600, apagado no fim; archivelog, FRA e redo pela linha de comando): CDB + PDB em ASM, AL32UTF8, ASMM; confere registro no Restart, archivelog, PDB aberta, memória, FRA e redo; mostra o `dba_registry_sqlpatch` | **Em `si_fs`**: `storageType=FS`, `datafileDestination=ora_db_data_dir`, `recoveryAreaDestination=ora_db_fra_dir`; confere que todos os datafiles ficaram no diretório pedido.
+| 10 | `playbooks/60_dbca.yml` — `dbca -silent -createDatabase` (rsp do template oficial, senhas do vault, 0600, apagado no fim; archivelog, FRA e redo pela linha de comando): CDB + PDB em ASM, AL32UTF8, ASMM; confere registro no Restart, archivelog, PDB aberta, memória, FRA e redo; mostra o `dba_registry_sqlpatch` | **Em `si_fs`**: `storageType=FS`, `datafileDestination=ora_db_data_dir`, `recoveryAreaDestination=ora_db_fra_dir`; confere que todos os datafiles ficaram no diretório pedido. **No RAC**: `databaseConfigType=RAC` + `nodelist` no rsp, `dbca` só no 1º nó (instância `<db><nº>` por nó, registrada no Clusterware); `ora_db_diskgroup`/`ora_db_fra_diskgroup` vêm do inventário e não podem ser o diskgroup do OCR.
 | 10a | `playbooks/62_autostart.yml` — **só `si_fs`**: `Y` no `/etc/oratab` e `/etc/init.d/dbora` com o texto da doc (unxar 19c §2.2.1; `dbstart $ORACLE_HOME` também sobe o listener), `chgrp dba`, `0750` e links `rc0.d/K01dbora`, `rc3.d/S99dbora` e `rc5.d/S99dbora`. Não reinicia nada |
-| 11 | `playbooks/65_db_service.yml` — serviço do Restart por PDB (`srvctl add service -pdb -policy AUTOMATIC`, só se não existir; nunca altera um existente) e garante o serviço rodando, o que abre a PDB em READ WRITE; idempotente | **Em `si_fs`** (sem Restart): `DBMS_SERVICE.CREATE_SERVICE`/`START_SERVICE` na PDB e `ALTER PLUGGABLE DATABASE ... SAVE STATE` (Multitenant Guide 19c). Se o serviço de usuário volta sozinho depois do reinício não está documentado: a fase 70 e o reboot do lab conferem.
-| 12 | `playbooks/70_hugepages.yml` — depois do banco criado (doc 19c): `vm.nr_hugepages` = soma dos segmentos de memória compartilhada da instância (`sysresv` + `ipcs`, por segmento, arredondando para cima) + `ora_hugepages_extra` (2) em `/etc/sysctl.d/99-nr_hugepages.conf` (≤ 70% da RAM; confere memlock ≥ 90% e `vm.hugetlb_shm_group`); **reinicia o banco via srvctl** até o SGA estar em HugePages (com `TRUE`, prova pela tabela EXPECTED/ALLOCATED_PAGES da última partida no alert log, porque o segmento pequeno fica em 4K de propósito) e depois para valer `USE_LARGE_PAGES=ONLY`; confere serviços e PDBs abertos depois do reinício | **Em `si_fs`**: reinício por `shutdown immediate`/`startup` no SQL*Plus.
+| 11 | `playbooks/65_db_service.yml` — serviço do Restart por PDB (`srvctl add service -pdb -policy AUTOMATIC`, só se não existir; nunca altera um existente) e garante o serviço rodando, o que abre a PDB em READ WRITE; idempotente | **No RAC**: `srvctl add service -pdb -preferred <orcl1,orcl2,…>` só no 1º nó. **Em `si_fs`** (sem Restart): `DBMS_SERVICE.CREATE_SERVICE`/`START_SERVICE` na PDB e `ALTER PLUGGABLE DATABASE ... SAVE STATE` (Multitenant Guide 19c). Se o serviço de usuário volta sozinho depois do reinício não está documentado: a fase 70 e o reboot do lab conferem.
+| 12 | `playbooks/70_hugepages.yml` — depois do banco criado (doc 19c): `vm.nr_hugepages` = soma dos segmentos de memória compartilhada da instância (`sysresv` + `ipcs`, por segmento, arredondando para cima) + `ora_hugepages_extra` (2) em `/etc/sysctl.d/99-nr_hugepages.conf` (≤ 70% da RAM; confere memlock ≥ 90% e `vm.hugetlb_shm_group`); **reinicia o banco via srvctl** até o SGA estar em HugePages (com `TRUE`, prova pela tabela EXPECTED/ALLOCATED_PAGES da última partida no alert log, porque o segmento pequeno fica em 4K de propósito) e depois para valer `USE_LARGE_PAGES=ONLY`; confere serviços e PDBs abertos depois do reinício | **Em `si_fs`**: reinício por `shutdown immediate`/`startup` no SQL*Plus. **No RAC**: uma instância por vez (`serial: 1`), `srvctl stop/start instance -node` na instância local de cada nó.
 
 ## Como rodar
 
@@ -115,9 +115,7 @@ ansible-playbook -i ../../../inventories/<amb> playbooks/10_host_prep.yml -e ora
 time ansible-playbook -i ../../../inventories/<amb> playbooks/site.yml    -e ora_hosts=srvsi01 --ask-vault-pass
 ```
 
-**RAC** (`rac_cluster01`). **Hoje só até a fase 40** (Grid do cluster): as fases 50 a 70 ainda não
-tratam o `rac_asm` e recusam o cluster ("Esta fase ainda não trata o cenário rac_asm"), então o
-`site.yml` para na 50. Até elas ficarem prontas, rode o RAC por etapas (abaixo).
+**RAC** (`rac_cluster01`):
 
 ```bash
 ansible-playbook -i ../../../inventories/<amb> playbooks/00_gate.yml      -e ora_hosts=rac_cluster01 --check
@@ -128,8 +126,8 @@ time ansible-playbook -i ../../../inventories/<amb> playbooks/site.yml    -e ora
 
 ### Execução por etapas
 
-Uma fase por vez, cada uma em `--check` e depois de verdade. É o jeito de acompanhar cada passo, de
-retomar depois de uma falha e, por enquanto, o único jeito no RAC. O padrão de todo comando:
+Uma fase por vez, cada uma em `--check` e depois de verdade. É o jeito de acompanhar cada passo e de
+retomar depois de uma falha. O padrão de todo comando:
 
 ```bash
 ansible-playbook -i ../../../inventories/<amb> playbooks/<fase>.yml -e ora_hosts=<alvo> --check   # confere
@@ -144,14 +142,15 @@ ansible-playbook -i ../../../inventories/<amb> playbooks/<fase>.yml -e ora_hosts
 | `20_stage` | sim | sim | sim | confere a mídia e extrai os patches; no RAC, só no 1º nó |
 | `30_asmlib` | sim | — | — | ASMLib v3 e marcação dos discos |
 | `40_grid` | sim | — | sim | `--ask-vault-pass`; de 30 a 60 min |
-| `50_db_software` | sim | sim | em construção | cerca de 15 min |
+| `45_diskgroups` | — | — | sim | DATA/FRA do `ora_asm` no ASM; só disco vazio |
+| `50_db_software` | sim | sim | sim | cerca de 15 min |
 | `55_listener` | — | sim | — | listener do DB home |
-| `60_dbca` | sim | sim | em construção | `--ask-vault-pass`; cerca de 30 min |
+| `60_dbca` | sim | sim | sim | `--ask-vault-pass`; cerca de 30 min |
 | `62_autostart` | — | sim | — | banco no boot por `dbora` |
-| `65_db_service` | sim | sim | em construção | serviços das PDBs |
-| `70_hugepages` | sim | sim | em construção | **reinicia o banco**; em `prod`, `-e ora_confirm_env=prod` |
+| `65_db_service` | sim | sim | sim | serviços das PDBs |
+| `70_hugepages` | sim | sim | sim | **reinicia o banco**; em `prod`, `-e ora_confirm_env=prod` |
 
-Exemplo, RAC até o Grid:
+Exemplo, RAC completo:
 
 ```bash
 ansible-playbook -i ../../../inventories/<amb> playbooks/00_gate.yml      -e ora_hosts=rac_cluster01 --check

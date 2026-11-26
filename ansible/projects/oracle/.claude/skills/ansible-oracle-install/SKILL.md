@@ -154,6 +154,7 @@ cd /projetos/DESENVOLVIMENTO/desenvolvimento/db-toolbox/ansible/projects/oracle/
 | 20 | DBA copia a mídia para o stage, depois `20_stage.yml` | nome do arquivo igual ao do `ora_media` |
 | 30 | `30_asmlib.yml` | Só disco vazio por by-id |
 | 40 | `40_grid.yml --ask-vault-pass` | Pede o vault **até em `--check`** (o arg spec renderiza as senhas); cerca de 15 a 30 min |
+| 45 | `45_diskgroups.yml` | Só `rac_asm`: diskgroups além do do OCR; só disco vazio; idempotente |
 | 50 | `50_db_software.yml` | Cerca de 15 min |
 | 60 | `60_dbca.yml --ask-vault-pass` | Cerca de 30 min |
 | 65 | `65_db_service.yml` | Idempotente |
@@ -177,12 +178,10 @@ coisa. Se o achado for novo e confirmado, sugira acrescentá-lo ao arquivo.
 - Patch ou RU num ambiente já instalado (o antigo "Fluxo B"). O caminho é um projeto próprio,
   ainda inexistente.
 - Segundo Oracle home ao lado de banco existente: projeto separado, por decisão do DBA.
-- RAC além das fases prontas: o cenário `rac_asm` (grupo `oracle_rac`) está em construção. Prontas
-  para `rac_asm`: 00, 10, 15, 20 e 40. Ainda não implementadas: 50, 60, 65 e 70 — o `hosts` padrão
-  dessas fases exclui `oracle_rac` e as roles não têm ramo RAC; ao passá-las com
-  `-e ora_hosts=<cluster RAC>`, o `ora_hosts` sobrepõe o padrão e a fase aborta (ex.: a 50 afirma
-  `olr.loc` ausente, que após a 40 passa a existir). Não se aplicam ao RAC: 30 (ASMLib — disco por
-  udev na 15), 55 e 62 (`si_fs`). Desenho em `oracle-install/DESENHO-RAC.md`.
+- Não se aplicam ao RAC (`rac_asm`, grupo `oracle_rac`): 30 (ASMLib — disco por udev na 15), 55 e 62
+  (`si_fs`). As demais fases tratam o RAC: a 45 cria os diskgroups além do do OCR; na 50 e 60 só o 1º
+  nó de `ora_rac_nodes` roda o instalador/dbca; a 70 é `serial: 1`. Desenho em
+  `oracle-install/DESENHO-RAC.md`.
 - Banco em filesystem sem ASM, versões além da 19c, separação de papéis (usuário `grid`).
 
 Para essas situações, não sugira roles da oravirt nem adapte as fases de instalação.
