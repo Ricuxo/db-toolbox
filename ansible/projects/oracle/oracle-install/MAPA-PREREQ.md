@@ -34,7 +34,7 @@ ansible-playbook -i ../../../inventories/<amb> playbooks/<fase>.yml -e ora_hosts
 | Item do relatório | Fase | Role | O que a fase faz | Não cobre |
 |---|---|---|---|---|
 | RPM preinstall | 10_host_prep | ora_host_prep | instala `ora_host_prep_preinstall_rpm` da versão | — |
-| Pacotes exigidos | 10_host_prep | ora_host_prep | instala a lista `ora_host_prep_packages` (guia 19c para OL9) | versão mínima de pacote (ex.: `make-4.4.1-3`): instala a do repositório |
+| Pacotes exigidos | 10_host_prep | ora_host_prep | instala a lista `ora_host_prep_packages` do release e do major do SO (guia 19c) | versão mínima de pacote (ex.: `make-4.4.1-3`): instala a do repositório |
 | Grupos do ASM | 10_host_prep | ora_host_prep | cria `asmadmin` 54329, `asmdba` 54327, `asmoper` 54328 e põe o dono nos três (só com `ora_asm`) | — |
 | Dono do software e `oinstall` primário | 10_host_prep | ora_host_prep | confere; o dono vem do preinstall | criar o usuário |
 | Diretórios OFA e oraInventory | 10_host_prep | ora_host_prep | cria os diretórios e o oraInventory, se ausente | montar filesystem |
@@ -44,10 +44,10 @@ ansible-playbook -i ../../../inventories/<amb> playbooks/<fase>.yml -e ora_hosts
 | THP | 10_host_prep | ora_host_prep | UEK7 ou mais novo: `transparent_hugepage=madvise` no GRUB e em tempo de execução. RHCK: só confere o `never` do preinstall | o reboot: a fase não reinicia; no RHCK não altera |
 | cvuqdisk (Restart) | 40_grid | ora_grid | instala o `cvuqdisk-*.rpm` do diretório `cv/rpm` da mídia do Grid, antes do gridSetup | instalar antes da fase 40: não há fase própria |
 | Discos do ASM (persistência, dono, permissão) | 30_asmlib | ora_asmlib | `restart_asm`: ASMLib v3, partição GPT e `createdisk` por `by-id`, só em disco vazio | regras udev; discos compartilhados de RAC |
-| Discos do ASM compartilhados (RAC) | 15_rac_prep | ora_rac_prep | `rac_asm`: regra udev por WWN (`/dev/disk/by-id/wwn-*`) com `oracle:asmdba 0660`, igual nos nós; regra nova só com disco vazio | apresentar o LUN aos nós (infra); com o ASM já em uso, qualquer mudança na regra é recusada (incluir LUN depois da instalação é manual) |
+| Discos do ASM compartilhados (RAC) | 15_rac_prep | ora_rac_prep | `rac_asm`: regra udev por WWN (`/dev/disk/by-id/wwn-*`) com `oracle:asmadmin 0660`, igual nos nós; regra nova só com disco vazio | apresentar o LUN aos nós (infra); com o ASM já em uso, qualquer mudança na regra é recusada (incluir LUN depois da instalação é manual) |
 | SSH sem senha do dono entre os nós (RAC) | 15_rac_prep | ora_rac_prep | chave RSA do `oracle` (só se ausente), `authorized_keys` e `known_hosts` com todos os nós; testa `ssh <nó> date` | — |
 | HugePages | 70_hugepages | ora_hugepages | `vm.nr_hugepages` pela SGA real, depois do banco criado | antes do banco existir |
-| Kernel e versão do SO | — | — | nada: a fase 00 só recusa o que está fora do escopo | trocar kernel |
+| Kernel e versão do SO | — | — | nada: a fase 00 só recusa o que está fora da matriz `ora_supported_os` (distribuição, release, kernel e RU mínimos) | trocar kernel |
 | RAM, swap, `/tmp`, espaço em disco | — | — | nada | infra |
 | SCAN, VIPs, rede privada, DNS | — | — | nada | infra |
 | SELinux, firewall, swap, discos | — | — | nada, de propósito (README, Princípios) | — |

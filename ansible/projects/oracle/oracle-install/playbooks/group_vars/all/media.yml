@@ -5,8 +5,9 @@
 # O ora_media é o catálogo da RU escolhida. RU nova = uma entrada nova em ora_media_catalog.
 # ora_version (release da mídia base) fica no inventário: group_vars/oracle/main.yml.
 #
-# Suporte de SO por RU (guia 19c, "Supported Oracle Linux 9 Distributions for x86-64"): OL9 com UEK 8
-# só a partir da 19.32; da 19.19 em diante, OL9 com UEK 7 ou RHCK 5.14.0-70.22.1 ou mais novo.
+# Suporte de SO por RU (guia 19c, "Supported Oracle Linux <8|9|10> Distributions for x86-64",
+# conferido pela matriz ora_supported_os): OL9 com UEK 8 e OL10 só a partir da 19.32; OL9 com UEK 7
+# ou RHCK 5.14.0-70.22.1+ a partir da 19.19; OL8.8 com UEK 7 a partir da 19.23.
 #
 # A fase 20 identifica cada item pelo nome do arquivo, sem checksum (decisão do DBA, como a oravirt).
 # Chaves por cenário (fase 20): restart_asm grid_base, db_base, opatch, ru_grid, ru_db, asmlib;
@@ -27,12 +28,25 @@ ora_media_catalog:
     # Database 19c (19.32) on Oracle Linux 9 and RHEL 9".
     # A lista muda por cenário (ora_install_type, do grupo do inventário): o 39932578 só entra em si_fs.
     oneoffs: "{{ (_ora_oneoff_39932578 if ora_install_type == 'si_fs' else []) + _ora_oneoffs_common }}"
-    # ASMLib v3 para OL9 (oracle.com/linux/downloads/linux-asmlib-v9-downloads.html); a fase 30 confere a
-    # assinatura (rpm -K). O oracleasm-support vem do ol9_addons (gpgcheck=1), sem catálogo.
-    asmlib: {file: oracleasmlib-3.1.3-1.el9.x86_64.rpm}
+    # ASMLib v3 por major do Oracle Linux (páginas linux-asmlib-v<8|9|10>-downloads da Oracle); a
+    # fase 30 confere a assinatura (rpm -K). O oracleasm-support vem do ol<major>_addons
+    # (gpgcheck=1), sem catálogo.
+    asmlib:
+      "8":  {file: oracleasmlib-3.1.3.-1.el8.x86_64.rpm}
+      "9":  {file: oracleasmlib-3.1.3-1.el9.x86_64.rpm}
+      "10": {file: oracleasmlib-3.1.1-1.el10.x86_64.rpm}
     # CVU avulso (MOS 30839369, 23.26.3). NÃO usado na 19c em OL9: não tem dados de
     # referência de 19c para OL9 (usa os do OL7). Mapeado para quando o alvo for 26ai.
     # cvu: {file: p30839369_2326000_Linux-x86-64.zip}
+
+  # 19.33 (GIRU de outubro de 2026, CPU out/2026). Não há página "Installing Oracle Database 19c
+  # (19.33)" (a última é a da 19.32): sem one-offs por ora — NÃO VERIFICADO, decisão do DBA.
+  # OPatch: o README da GIRU 19.33 exige 12.2.0.1.52 ou mais novo. Sem ru_db nem asmlib: hoje só o rac_asm.
+  "19.33.0.0":
+    grid_base: {file: LINUX.X64_193000_grid_home.zip}
+    db_base:   {file: LINUX.X64_193000_db_home.zip}
+    opatch:    {file: p6880880_190000_Linux-x86-64.zip}
+    ru_grid:   {file: p39922757_190000_Linux-x86-64.zip, patchid: "39922757"}  # GI RELEASE UPDATE 19.33.0.0.0 (REL-OCT261020)
 
   # 19.30 (GIRU de janeiro de 2026). Não há página "Installing Oracle Database 19c (19.30) on Oracle
   # Linux 9" (só a da 19.32): os one-offs são decisão do DBA. OPatch: o README da GIRU 19.30 exige

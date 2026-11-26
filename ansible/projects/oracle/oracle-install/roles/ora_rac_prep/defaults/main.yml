@@ -1,6 +1,8 @@
 ---
-# Grupo dos discos do ASM: o OSDBA do ASM (asmdba), com 0660 para o dono da instalação.
+# Grupo dos discos do ASM: o OSASM (asmadmin), com 0660 para o dono da instalação.
+# O CVU/gridSetup compara o grupo do dispositivo com o OSASM do response file
+# (ora_grid_osasm); com asmdba o prereq falha com PRVF-9992.
 # Fonte: cwlin 19c, "Configuring Device Persistence Manually for Oracle ASM"
 # https://docs.oracle.com/en/database/oracle/oracle-database/19/cwlin/configuring-device-persistence-manually-for-oracle-asm.html
-ora_rac_prep_disk_group: asmdba
+ora_rac_prep_disk_group: asmadmin
 ora_rac_prep_udev_rules: /etc/udev/rules.d/99-oracle-asmdevices.rules

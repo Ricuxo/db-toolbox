@@ -3,40 +3,98 @@
 ora_host_prep_preinstall_rpm:
   "19": oracle-database-preinstall-19c
 
-# Pacotes exigidos pelo guia 19c para Oracle Linux 9 (x86-64). O preinstall não puxa todos
-# (ex.: compat-openssl11, libXtst, libvirt-libs, xz-devel), por isso a lista é instalada
-# explicitamente.
-# Fonte: Database Installation Guide 19c for Linux — Supported Oracle Linux 9 Distributions
-# https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/operating-system-requirements-for-x86-64-linux-platforms/supported-oracle-linux-9-distributions-for-x86-64.html
+# Pacotes exigidos pelo guia 19c, por release do Oracle e major do Oracle Linux (x86-64). O
+# preinstall não puxa todos, por isso a lista é instalada explicitamente.
+# Fontes: Database Installation Guide 19c for Linux — "Supported Oracle Linux <8|9|10>
+# Distributions for x86-64" (prefixo ladbi, abaixo).
 ora_host_prep_packages:
   "19":
-    - bc
-    - binutils
-    - compat-openssl11
-    - elfutils-libelf
-    - fontconfig
-    - glibc
-    - glibc-devel
-    - ksh
-    - libaio
-    - libX11
-    - libXau
-    - libXi
-    - libXrender
-    - libXtst
-    - libxcrypt-compat
-    - libgcc
-    - libibverbs
-    - libnsl
-    - libstdc++
-    - libxcb
-    - libvirt-libs
-    - make
-    - policycoreutils
-    - policycoreutils-python-utils
-    - smartmontools
-    - sysstat
-    - xz-devel
+    "8":
+      - bc
+      - binutils
+      - compat-openssl10
+      - elfutils-libelf
+      - elfutils-libelf-devel
+      - fontconfig
+      - glibc
+      - glibc-devel
+      - ksh
+      - libaio
+      - libaio-devel
+      - libXrender
+      - libX11
+      - libXau
+      - libXi
+      - libXtst
+      - libgcc
+      - libnsl
+      - librdmacm
+      - libstdc++
+      - libstdc++-devel
+      - libxcb
+      - libibverbs
+      - libasan
+      - liblsan
+      - make
+      - policycoreutils
+      - policycoreutils-python-utils
+      - rng-tools
+      - smartmontools
+      - sysstat
+    "9":
+      - bc
+      - binutils
+      - compat-openssl11
+      - elfutils-libelf
+      - fontconfig
+      - glibc
+      - glibc-devel
+      - ksh
+      - libaio
+      - libX11
+      - libXau
+      - libXi
+      - libXrender
+      - libXtst
+      - libxcrypt-compat
+      - libgcc
+      - libibverbs
+      - libnsl
+      - libstdc++
+      - libxcb
+      - libvirt-libs
+      - make
+      - policycoreutils
+      - policycoreutils-python-utils
+      - smartmontools
+      - sysstat
+      - xz-devel
+    "10":
+      - bc
+      - binutils
+      - elfutils-libelf
+      - fontconfig
+      - glibc
+      - glibc-devel
+      - ksh
+      - libaio
+      - libgcc
+      - libibverbs
+      - libstdc++
+      - libvirt-libs
+      - libxcb
+      - libX11
+      - libXau
+      - libXi
+      - libXrender
+      - libXtst
+      - libxcrypt-compat
+      - make
+      - policycoreutils
+      - policycoreutils-python-utils
+      - smartmontools
+      - sysstat
+      - xz-devel
 
 # Grupos de ASM, só em servidor com ASM (ora_asm definido). Nomes e GIDs da documentação 19c.
 # O template oficial gridsetup.rsp exige OSASM diferente do OSDBA; o dono único entra nos três.

@@ -1,6 +1,27 @@
 ---
-# Oracle Linux 9: comando do guia 19c (página de THP para UEK) para aplicar o
-# GRUB_CMDLINE_LINUX também às entradas BLS. Vale no próximo boot; a role não reinicia.
+# Oracle Linux 9+: comando do guia 19c (página de THP para UEK) para aplicar o
+# GRUB_CMDLINE_LINUX também às entradas BLS. No OL8 o grub2-mkconfig não tem
+# --update-bls-cmdline e as entradas usam "options $kernelopts" (grubenv): a atualização
+# é pelo grubby. Vale no próximo boot; a role não reinicia.
+- name: Host | grub2-mkconfig aceita --update-bls-cmdline?
+  ansible.builtin.command: grub2-mkconfig --help
+  register: _h_grub2_help
+  changed_when: false
+  failed_when: false
+
 - name: Host | Regenerar grub.cfg e entradas BLS
   ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg --update-bls-cmdline
+  when: "'--update-bls-cmdline' in _h_grub2_help.stdout"
+  changed_when: true
+
+- name: Host | Regenerar grub.cfg (sem --update-bls-cmdline, OL8)
+  ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg
+  when: "'--update-bls-cmdline' not in _h_grub2_help.stdout"
+  changed_when: true
+
+- name: Host | kernelopts das entradas BLS com THP madvise (grubby, OL8)
+  ansible.builtin.command: >-
+    grubby --update-kernel=ALL --remove-args=transparent_hugepage
+    --args=transparent_hugepage=madvise
+  when: "'--update-bls-cmdline' not in _h_grub2_help.stdout"
   changed_when: true

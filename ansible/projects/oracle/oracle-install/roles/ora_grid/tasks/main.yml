@@ -108,6 +108,28 @@
   register: _grid_applied
   when: _grid_ps.stat.isdir | default(false)
 
+# Home "preparado": RU e todos os one-offs já aplicados no home (ex.: o gridSetup abortou nos
+# pré-requisitos depois do -applyRU) e nada registrado (sem olr.loc, sem inventory.xml). Nesse
+# estado a fase retoma: a extração/OPatch/cvuqdisk são idempotentes e o gridSetup roda sem
+# -applyRU/-applyOneOffs. Patch aplicado pela metade continua sendo motivo de aborto.
+- name: Grid | Home preparado (RU e one-offs já aplicados)
+  ansible.builtin.set_fact:
+    _grid_prepared: >-
+      {{ _grid_applied.files | default([]) | length > 0
+         and _grid_applied.files | default([]) | length
+             >= (_grid_ru_sub.files | default([]) | length
+                 + (ora_media.oneoffs | default([]) | length)) }}
+
+# Setup concluído, configuração pendente: o home já está registrado no inventário (o gridSetup
+# terminou) mas o root.sh ainda não rodou (sem olr.loc). Nesse estado a fase retoma pulando o
+# gridSetup e seguindo para orainstRoot.sh, root.sh e -executeConfigTools, todos idempotentes
+# (removes/creates). Com olr.loc, a instalação já rodou de ponta a ponta e a fase aborta como
+# "Grid instalado", sem reexecutar nada.
+- name: Grid | Home registrado e root.sh já executado
+  ansible.builtin.set_fact:
+    _grid_home_registered: "{{ _grid_signs.results[1].stat.exists | default(false) }}"
+    _grid_installed: "{{ _grid_signs.results[0].stat.exists | default(false) }}"
+
 # No RAC o gridSetup copia o home para os outros nós: lá o Grid home tem de estar ausente ou vazio.
 - name: Grid | RAC — conteúdo do Grid home nos outros nós
   ansible.builtin.find:
@@ -121,10 +143,18 @@
 
 - name: Grid | Abortar se não for um servidor limpo
   vars:
+    # olr.loc = instalado → aborta. inventory.xml sem olr.loc = configuração pendente → retoma.
+    # No RAC o home populado dos outros nós só é aceito com o nó de instalação já registrado
+    # (o push do gridSetup terminou); caso contrário é sobra de tentativa → aborta.
+    _install_registered: >-
+      {{ _grid_home_registered if not _grid_rac else
+         (hostvars[ora_rac_nodes[0].name]._grid_home_registered | default(false)) }}
     _found: >-
-      {{ (_grid_signs.results | selectattr('stat.exists') | map(attribute='item') | list)
-         + (_grid_applied.files | default([]) | map(attribute='path') | list)
-         + ([ora_grid_home ~ ' (não vazio)'] if (_grid_remote_home.matched | default(0)) > 0 else []) }}
+      {{ ([_grid_signs.results[0].item] if _grid_installed | bool else [])
+         + ([] if (_grid_prepared or _grid_home_registered) | default(false) else
+            (_grid_applied.files | default([]) | map(attribute='path') | list))
+         + ([ora_grid_home ~ ' (não vazio)']
+            if (_grid_remote_home.matched | default(0)) > 0 and not (_install_registered | bool) else []) }}
   ansible.builtin.assert:
     that:
       - _grid_running.rc != 0
@@ -137,6 +167,20 @@
           ~ ora_grid_home ~ '/bin/crsctl stat res -t ou limpe o home antes de reinstalar.')
          if _found else '' }}
     quiet: true
+
+- name: Grid | Retomada — home já preparado com a RU
+  ansible.builtin.debug:
+    msg: >-
+      RU e one-offs já aplicados em {{ ora_grid_home }} (execução anterior parou depois do
+      -applyRU). Retomando: o gridSetup roda sem -applyRU/-applyOneOffs.
+  when: (_grid_prepared | default(false) | bool) and not (_grid_home_registered | default(false) | bool)
+
+- name: Grid | Retomada — setup concluído, configuração pendente
+  ansible.builtin.debug:
+    msg: >-
+      Home registrado no inventário e root.sh pendente em {{ inventory_hostname }}. Retomando:
+      sem gridSetup; segue com orainstRoot.sh, root.sh e -executeConfigTools.
+  when: (_grid_home_registered | default(false) | bool) and not (_grid_installed | bool)
 
 
 - name: Grid | Senhas do Vault presentes
@@ -197,15 +241,25 @@
     quiet: true
   when: _grid_rac | bool
 
-- name: Grid | RAC — cvuqdisk instalado nos outros nós
+- name: Grid | RAC — cvuqdisk instalado nos outros nós?
   ansible.builtin.command: rpm -q cvuqdisk
   register: _grid_rac_cvuqdisk
   changed_when: false
+  failed_when: false
   check_mode: false
-  failed_when: _grid_rac_cvuqdisk.rc != 0
   when:
     - _grid_rac | bool
     - not _grid_install_node | bool
+
+- name: Grid | RAC — cvuqdisk ausente, a fase instala (--check)
+  ansible.builtin.command: "true"
+  changed_when: true
+  check_mode: false
+  when:
+    - _grid_rac | bool
+    - not _grid_install_node | bool
+    - ansible_check_mode
+    - _grid_rac_cvuqdisk.rc != 0
 
 # Descompactar, trocar o OPatch e instalar o cvuqdisk não têm como ser simulados: num servidor limpo
 # o Grid home ainda não existe (o unarchive falha em --check, e o grep do OPatch e o find do cvuqdisk
@@ -297,6 +351,59 @@
         CVUQDISK_GRP: "{{ ora_install_group }}"
       when: _grid_cvuqdisk_q.rc != 0
 
+    # RAC: o gridSetup exige o cvuqdisk em TODOS os nós (PRVG-11550). O RPM só existe na mídia, que
+    # fica no nó de instalação: fetch para o controller e copy para os outros.
+    - name: Grid | RAC — nome do pacote cvuqdisk
+      ansible.builtin.set_fact:
+        _grid_cvuqdisk_name: "{{ _grid_cvuqdisk.files[0].path | basename }}"
+      when: _grid_rac | bool
+
+    - name: Grid | RAC — cvuqdisk para o controller
+      ansible.builtin.fetch:
+        src: "{{ _grid_cvuqdisk.files[0].path }}"
+        dest: /tmp/
+        flat: true
+      when: _grid_rac | bool
+
+- name: Grid | RAC — cvuqdisk para os outros nós
+  ansible.builtin.copy:
+    src: "/tmp/{{ hostvars[ora_rac_nodes[0].name]._grid_cvuqdisk_name }}"
+    dest: "/tmp/{{ hostvars[ora_rac_nodes[0].name]._grid_cvuqdisk_name }}"
+    mode: "0644"
+  when:
+    - _grid_rac | bool
+    - not _grid_install_node | bool
+    - _grid_rac_cvuqdisk.rc != 0
+
+- name: Grid | RAC — instalar o cvuqdisk nos outros nós (rpm -iv, como na doc)
+  ansible.builtin.command: rpm -iv /tmp/{{ hostvars[ora_rac_nodes[0].name]._grid_cvuqdisk_name }}
+  environment:
+    CVUQDISK_GRP: "{{ ora_install_group }}"
+  register: _grid_rac_cvuqdisk_rpm
+  when:
+    - _grid_rac | bool
+    - not _grid_install_node | bool
+    - _grid_rac_cvuqdisk.rc != 0
+
+- name: Grid | RAC — remover o RPM temporário
+  ansible.builtin.file:
+    path: "/tmp/{{ hostvars[ora_rac_nodes[0].name]._grid_cvuqdisk_name }}"
+    state: absent
+  when:
+    - _grid_rac | bool
+    - not _grid_install_node | bool
+    - _grid_rac_cvuqdisk.rc != 0
+
+- name: Grid | RAC — cvuqdisk instalado nos outros nós
+  ansible.builtin.command: rpm -q cvuqdisk
+  register: _grid_rac_cvuqdisk_check
+  changed_when: false
+  check_mode: false
+  failed_when: _grid_rac_cvuqdisk_check.rc != 0
+  when:
+    - _grid_rac | bool
+    - not _grid_install_node | bool
+
 # ---------- Pré-requisitos ----------
 # O gate é a checagem integrada ao gridSetup ("Oracle Universal Installer is fully integrated with
 # CVU", 19c cwlin), rodando já com a RU 19.32 aplicada pelo -applyRU; nunca -ignorePrereqFailure.
@@ -338,16 +445,17 @@
       ansible.builtin.command:
         argv: >-
           {{ [ora_grid_home ~ '/gridSetup.sh', '-silent',
-              '-responseFile', _grid_tmp.path ~ '/gridsetup.rsp',
-              '-applyRU', _grid_ru_dir]
-             + (['-applyOneOffs', _grid_oneoff_dirs | join(',')] if _grid_oneoff_dirs else []) }}
+              '-responseFile', _grid_tmp.path ~ '/gridsetup.rsp']
+             + (['-applyRU', _grid_ru_dir] if not (_grid_prepared | default(false)) else [])
+             + (['-applyOneOffs', _grid_oneoff_dirs | join(',')]
+                if _grid_oneoff_dirs and not (_grid_prepared | default(false)) else []) }}
         chdir: "{{ ora_grid_home }}"
       become: true
       become_user: "{{ ora_owner }}"
       async: 10800
       poll: 60
       register: _grid_setup
-      when: _grid_install_node | bool
+      when: (_grid_install_node | bool) and not (_grid_home_registered | bool)
       # rc 6 = "Successfully Setup Software with warning(s)". Só passa se TODOS os avisos estiverem
       # em ora_grid_accept_warnings (vazio por padrão: qualquer aviso para a fase).
       failed_when: >-

@@ -65,26 +65,32 @@
   check_mode: false
   failed_when: _al_blkid.stdout not in ['', 'oracleasm']
 
+- name: ASMLib | RPM do SO deste host
+  ansible.builtin.set_fact:
+    _al_asmlib_file: >-
+      {{ (((ora_media.asmlib | default({}))[ansible_facts['distribution_major_version'] | string]
+         | default(ora_media.asmlib | default({}))).file | default('')) }}
+
 - name: ASMLib | oracleasmlib no catálogo
   ansible.builtin.assert:
-    that: ora_media.asmlib.file | default('') | length > 0
-    fail_msg: "ora_media.asmlib (file) é obrigatório para a fase 30."
+    that: _al_asmlib_file | length > 0
+    fail_msg: "ora_media.asmlib.<major do SO> (file) é obrigatório para a fase 30."
     quiet: true
 
 - name: ASMLib | oracleasmlib no stage
   ansible.builtin.stat:
-    path: "{{ ora_stage_dir }}/{{ ora_media.asmlib.file }}"
+    path: "{{ ora_stage_dir }}/{{ _al_asmlib_file }}"
     get_checksum: false
   register: _al_rpm
 
 - name: ASMLib | oracleasmlib presente
   ansible.builtin.assert:
     that: _al_rpm.stat.isreg | default(false)
-    fail_msg: "{{ ora_media.asmlib.file }}: ausente no stage."
+    fail_msg: "{{ _al_asmlib_file }}: ausente no stage."
     quiet: true
 
 - name: ASMLib | Assinatura do oracleasmlib (rpm -K)
-  ansible.builtin.command: rpm -K {{ ora_stage_dir }}/{{ ora_media.asmlib.file }}
+  ansible.builtin.command: rpm -K {{ ora_stage_dir }}/{{ _al_asmlib_file }}
   register: _al_sig
   changed_when: false
   check_mode: false
@@ -101,19 +107,32 @@
   ansible.builtin.command: dnf config-manager --set-enabled {{ ora_asmlib_repo }}
   when: ora_asmlib_repo not in _al_repos.stdout
 
+# dnf por 'command', não pelo módulo: no OL8 as bindings python do dnf só existem para o
+# platform-python 3.6, que o Ansible 2.20 não executa; o CLI dnf resolve internamente.
+# O enablerepo explícito também cobre o --check, em que o config-manager não roda.
+- name: ASMLib | Pacotes presentes?
+  ansible.builtin.command: rpm -q oracleasm-support oracleasmlib
+  register: _al_pkgs_q
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
 - name: ASMLib | Pacotes
-  ansible.builtin.dnf:
-    name:
-      - oracleasm-support
-      - "{{ ora_stage_dir }}/{{ ora_media.asmlib.file }}"
-    state: present
-    enablerepo: "{{ ora_asmlib_repo }}"   # também cobre o --check, em que o config-manager não roda
-  register: _al_pkgs
+  ansible.builtin.command: >-
+    dnf install -y --enablerepo={{ ora_asmlib_repo }}
+    oracleasm-support {{ ora_stage_dir }}/{{ _al_asmlib_file }}
+  when: _al_pkgs_q.rc != 0
+
+- name: ASMLib | Pacotes ausentes (--check)
+  ansible.builtin.command: "true"
+  changed_when: true
+  check_mode: false
+  when: ansible_check_mode and _al_pkgs_q.rc != 0
 
 # Em --check sem os pacotes, o resto não tem como ser avaliado.
 - name: ASMLib | Fim do --check (pacotes ainda não instalados)
   ansible.builtin.meta: end_host
-  when: ansible_check_mode and _al_pkgs is changed
+  when: ansible_check_mode and _al_pkgs_q.rc != 0
 
 - name: ASMLib | Configuração atual
   ansible.builtin.command: oracleasm configure

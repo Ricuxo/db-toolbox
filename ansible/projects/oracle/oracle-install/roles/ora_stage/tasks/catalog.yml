@@ -29,10 +29,24 @@
     quiet: true
   loop: "{{ _stage_keys }}"
 
+# A fase 20 roda com gather_facts: false; o major do SO vem do RPM do próprio Oracle Linux.
+- name: Stage | Major do Oracle Linux
+  ansible.builtin.command: rpm -q --qf '%{VERSION}' oraclelinux-release
+  register: _stage_os_ver
+  changed_when: false
+  check_mode: false
+
+- name: Stage | Catálogo com o ASMLib do SO deste host
+  ansible.builtin.set_fact:
+    _stage_ora_media: >-
+      {{ ora_media | combine({'asmlib':
+         ((ora_media.asmlib | default({}))[_stage_os_ver.stdout.split('.')[0]]
+          | default(ora_media.asmlib | default({})))}) }}
+
 - name: Stage | Montar lista de mídia esperada
   ansible.builtin.set_fact:
     _stage_items: >-
-      {{ (_stage_keys | map('extract', ora_media) | list) + (ora_media.oneoffs | default([]))
+      {{ (_stage_keys | map('extract', _stage_ora_media) | list) + (ora_media.oneoffs | default([]))
        + ([ora_media.cvu] if ora_media.cvu is defined and ora_install_type == 'restart_asm' else []) }}
 
 - name: Stage | Catálogo completo (arquivo preenchido)

@@ -6,7 +6,9 @@ argument_specs:
       - restart_asm, Grid for a Standalone Server (HA_CONFIG); rac_asm, Grid for a Cluster (CRS_CONFIG, Standalone Cluster).
       - No RAC, o instalador roda no 1º nó de ora_rac_nodes; orainstRoot.sh e root.sh em todos, um nó por vez.
       - gridSetup.sh silencioso com -applyRU/-applyOneOffs; nunca -ignorePrereq.
-      - Aborta se não for servidor limpo: instalador rodando, olr.loc, .patch_storage no home ou inventário.
+      - Aborta se não for servidor limpo: instalador rodando, olr.loc (instalado) ou patch aplicado pela metade.
+      - Retoma home preparado (RU/one-offs aplicados, nada registrado): gridSetup sem -applyRU.
+      - Retoma setup concluído com configuração pendente (inventory.xml sem olr.loc): sem gridSetup, segue para os root.sh e -executeConfigTools.
       - Apaga response files de execuções interrompidas (/tmp/ora_grid_*) antes de começar.
       - Response file 0600, dono oracle, senhas do Vault, apagado ao fim.
     options:

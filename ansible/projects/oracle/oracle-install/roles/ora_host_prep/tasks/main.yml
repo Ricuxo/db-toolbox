@@ -3,25 +3,59 @@
 # Não altera SELinux, firewall, swap nem discos. No GRUB só troca o THP para 'madvise'
 # (guia, UEK7+; no RHCK só confere o 'never'); o 'numa=off' gravado pelo preinstall é documentado e fica.
 
-- name: Host | Release suportado por esta role
+- name: Host | Release e SO suportados por esta role
   ansible.builtin.assert:
     that:
       - _hp_release in ora_host_prep_preinstall_rpm
       - _hp_release in ora_host_prep_packages
-    fail_msg: "Release {{ ora_version }} sem preinstall/lista de pacotes definidos nesta role."
+      - _hp_os_major in ora_host_prep_packages[_hp_release]
+    fail_msg: >-
+      Release {{ ora_version }} ou SO {{ ansible_facts['distribution'] }}
+      {{ ansible_facts['distribution_major_version'] }} sem preinstall/lista de pacotes definidos
+      nesta role.
     quiet: true
   vars:
     _hp_release: "{{ ora_version.split('.')[0] }}"
+    _hp_os_major: "{{ ansible_facts['distribution_major_version'] | string }}"
+
+# dnf por 'command', não pelo módulo: no OL8 as bindings python do dnf só existem para o
+# platform-python 3.6, que o Ansible 2.20 não executa; o CLI dnf resolve internamente.
+# rpm -q (check_mode: false) dá a idempotência e a visão do --check.
+- name: Host | RPM preinstall presente?
+  ansible.builtin.command: rpm -q {{ ora_host_prep_preinstall_rpm[ora_version.split('.')[0]] }}
+  register: _hp_preinstall_q
+  changed_when: false
+  failed_when: false
+  check_mode: false
 
 - name: Host | RPM preinstall
-  ansible.builtin.dnf:
-    name: "{{ ora_host_prep_preinstall_rpm[ora_version.split('.')[0]] }}"
-    state: present
+  ansible.builtin.command: dnf install -y {{ ora_host_prep_preinstall_rpm[ora_version.split('.')[0]] }}
+  when: _hp_preinstall_q.rc != 0
+
+- name: Host | RPM preinstall ausente (--check)
+  ansible.builtin.command: "true"
+  changed_when: true
+  check_mode: false
+  when: ansible_check_mode and _hp_preinstall_q.rc != 0
+
+- name: Host | Pacotes exigidos presentes?
+  ansible.builtin.command: >-
+    rpm -q {{ ora_host_prep_packages[ora_version.split('.')[0]][ansible_facts['distribution_major_version'] | string] | join(' ') }}
+  register: _hp_pkgs_q
+  changed_when: false
+  failed_when: false
+  check_mode: false
 
 - name: Host | Pacotes exigidos pela documentação da versão
-  ansible.builtin.dnf:
-    name: "{{ ora_host_prep_packages[ora_version.split('.')[0]] }}"
-    state: present
+  ansible.builtin.command: >-
+    dnf install -y {{ ora_host_prep_packages[ora_version.split('.')[0]][ansible_facts['distribution_major_version'] | string] | join(' ') }}
+  when: _hp_pkgs_q.rc != 0
+
+- name: Host | Pacotes exigidos ausentes (--check)
+  ansible.builtin.command: "true"
+  changed_when: true
+  check_mode: false
+  when: ansible_check_mode and _hp_pkgs_q.rc != 0
 
 - name: Host | Dono do software criado pelo preinstall
   ansible.builtin.getent:

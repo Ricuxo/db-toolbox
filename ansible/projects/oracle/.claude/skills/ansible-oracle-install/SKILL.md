@@ -2,7 +2,7 @@
 name: ansible-oracle-install
 description: >-
   Pré-voo e orientação do projeto Ansible oracle-install (roles próprias, variáveis ora_; 19c,
-  Oracle Restart, ASM com ASMLib v3, Oracle Linux 9, servidor novo). Revisa o inventário antes de
+  Oracle Restart, ASM com ASMLib v3, Oracle Linux 8/9/10, servidor novo). Revisa o inventário antes de
   rodar (ora_version, ora_ru, catálogo ora_media e one-offs exigidos pela página oficial da RU,
   discos by-id, vault, accept_warnings, allow_existing), descobre em que fase o servidor está,
   concilia o stage com o catálogo, diz qual fase vem com o comando pronto e interpreta falhas das
@@ -69,7 +69,7 @@ Marque cada item como `[ok]`, `[FALTA]`, `[ATENÇÃO]` ou `[RISCO]`.
 - Chaves obrigatórias: `grid_base`, `db_base`, `opatch`, `ru_grid`, `ru_db`. Cada item com `file`.
   `patchid` nos RUs e em cada one-off. `asmlib` é obrigatório para a fase 30.
 - **One-offs exigidos pela RU:** leia a página oficial "Installing Oracle Database 19c (19.xx) on
-  Oracle Linux 9 and RHEL 9" da RU alvo e compare com `ora_media.oneoffs`. Um one-off exigido que
+  <plataforma>" da RU e do SO alvo e compare com `ora_media.oneoffs`. Um one-off exigido que
   falta vira `[FALTA]`. Um one-off que está no catálogo e não aparece na página vira `[ATENÇÃO]`,
   para o DBA confirmar.
 - O one-off tem de ser a variante da RU alvo. O nome leva a RU em 5 partes sem pontos (ex.: `p39544247_1932000DBRU_…`

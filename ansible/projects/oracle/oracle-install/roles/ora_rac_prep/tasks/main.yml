@@ -119,7 +119,7 @@
   ansible.builtin.shell: |
     set -e
     udevadm control --reload-rules
-    udevadm trigger --action=change {{ _rp_disk_stat.results | map(attribute='stat.lnk_source') | join(' ') }}
+    udevadm trigger --action=change --sysname-match={{ _rp_disk_stat.results | map(attribute='stat.lnk_source') | map('basename') | join(' --sysname-match=') }}
     udevadm settle
   changed_when: true
   when: _rp_rules is changed

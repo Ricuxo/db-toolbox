@@ -2,17 +2,31 @@
 # Gate somente leitura. Todas as tasks rodam também em --check (check_mode: false)
 # porque apenas leem o estado do servidor.
 
-- name: Gate | SO dentro do escopo do projeto
+- name: Gate | Kernel em uso (flavor e série para a matriz)
+  ansible.builtin.set_fact:
+    _gate_kernel_flavor: "{{ 'uek' if 'uek' in ansible_facts['kernel'] else 'rhck' }}"
+    _gate_kernel_series: "{{ ansible_facts['kernel'].split('.')[0] }}"
+
+- name: Gate | SO, kernel e RU dentro da matriz suportada
   ansible.builtin.assert:
-    that:
-      - ora_supported_os
+    that: _gate_matching_os | length > 0
+    fail_msg: >-
+      SO/kernel/RU fora da matriz suportada: {{ ansible_facts['distribution'] }}
+      {{ ansible_facts['distribution_version'] }}, kernel {{ ansible_facts['kernel'] }}
+      ({{ _gate_kernel_flavor }}, série {{ _gate_kernel_series }}), ora_ru {{ ora_ru }}.
+      Confira ora_supported_os e a documentação da versão. Não prosseguir.
+    quiet: true
+  vars:
+    _gate_matching_os: >-
+      {{ ora_supported_os
         | selectattr('distribution', 'equalto', ansible_facts['distribution'])
         | selectattr('major', 'equalto', ansible_facts['distribution_major_version'] | string)
-        | list | length > 0
-    fail_msg: >-
-      SO {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }} fora do escopo
-      (ora_supported_os). Não prosseguir.
-    quiet: true
+        | selectattr('min_release', 'version', ansible_facts['distribution_version'], '<=')
+        | selectattr('kernel_flavor', 'equalto', _gate_kernel_flavor)
+        | selectattr('kernel_series', 'equalto', _gate_kernel_series)
+        | selectattr('min_kernel', 'version', ansible_facts['kernel'], '<=')
+        | selectattr('min_ru', 'version', ora_ru, '<=')
+        | list }}
 
 - name: Gate | Arquivos que indicam Oracle instalado
   ansible.builtin.stat:

@@ -7,6 +7,15 @@
 # <stage>/patches/<ru>/<patchid>/<patchid>/
 ora_stage_patch_dir: "{{ ora_stage_dir }}/patches/{{ ora_ru }}"
 
-# Escopo da 1ª versão do projeto.
+# Matriz SO × kernel × RU suportada pelo projeto (somente Oracle Linux x86-64, 19c).
+# Fonte: ladbi/cwlin 19c, "Supported Oracle Linux <8|9|10> Distributions for x86-64" e
+# "Operating System Checklist for Oracle Grid Infrastructure and Oracle RAC".
+# O gate confere distribuição, release, flavor (uek/rhck), série do kernel e ora_ru.
 ora_supported_os:
-  - {distribution: OracleLinux, major: "9"}
+  - {distribution: OracleLinux, major: "8",  min_release: "8.8",  kernel_flavor: uek,  kernel_series: "5", min_kernel: "5.15.0-202.135.2",   min_ru: "19.23.0.0"}
+  - {distribution: OracleLinux, major: "8",  min_release: "8.0",  kernel_flavor: rhck, kernel_series: "4", min_kernel: "4.18.0-80",          min_ru: "19.3.0.0"}
+  - {distribution: OracleLinux, major: "9",  min_release: "9.0",  kernel_flavor: uek,  kernel_series: "5", min_kernel: "5.15.0-1.43.4.2",    min_ru: "19.19.0.0"}
+  - {distribution: OracleLinux, major: "9",  min_release: "9.0",  kernel_flavor: rhck, kernel_series: "5", min_kernel: "5.14.0-70.22.1.0.2", min_ru: "19.19.0.0"}
+  - {distribution: OracleLinux, major: "9",  min_release: "9.6",  kernel_flavor: uek,  kernel_series: "6", min_kernel: "6.12.0-1.23.3.2",    min_ru: "19.32.0.0"}
+  - {distribution: OracleLinux, major: "10", min_release: "10.0", kernel_flavor: uek,  kernel_series: "6", min_kernel: "6.12.0-104.43.4.2",  min_ru: "19.32.0.0"}
+  - {distribution: OracleLinux, major: "10", min_release: "10.0", kernel_flavor: rhck, kernel_series: "6", min_kernel: "6.12.0-55.40.1.0.1", min_ru: "19.32.0.0"}

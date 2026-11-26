@@ -1,7 +1,8 @@
 # oracle-install
 
 Instalação de Oracle com Ansible, com roles próprias (sem dependência da oravirt).
-Escopo atual: **19c · Oracle Linux 9 · dono único `oracle`**, em dois cenários:
+Escopo atual: **19c · Oracle Linux 8/9/10 (somente o que a matriz `ora_supported_os` permite, com o
+kernel e a RU mínimos da linha) · dono único `oracle`**, em três cenários:
 
 | Cenário | Grupo do inventário | O que instala | Fases |
 |---|---|---|---|
@@ -46,7 +47,7 @@ host RAC na guarda de ambiente (`ora_env_phase_types`).
 | 1 | Validar pré-requisitos de SO — **triagem** (só bloqueios de infra) |
 | 2 | `playbooks/00_gate.yml` — gate (só leitura) |
 | 3 | `playbooks/10_host_prep.yml` — preinstall + pacotes + `kernel.panic` (exigido pelo gridSetup 19.32) + nome do servidor no `/etc/hosts` (com ou sem DNS) + grupos de ASM (se `ora_asm`) + diretórios OFA + stage + `/dev/shm` |
-| 3a | `playbooks/15_rac_prep.yml` — **só `rac_asm`**, todos os nós de uma vez: regra udev dos discos do ASM por WWN (`oracle:asmdba 0660`, igual nos nós, regra nova só com disco vazio) e SSH sem senha do `oracle` entre os nós (`authorized_keys`, `known_hosts` com a chave de host lida do próprio nó, teste `ssh <nó> date`; cwlin 19c) |
+| 3a | `playbooks/15_rac_prep.yml` — **só `rac_asm`**, todos os nós de uma vez: regra udev dos discos do ASM por WWN (`oracle:asmadmin 0660`, igual nos nós, regra nova só com disco vazio) e SSH sem senha do `oracle` entre os nós (`authorized_keys`, `known_hosts` com a chave de host lida do próprio nó, teste `ssh <nó> date`; cwlin 19c) |
 | 4 | Validar pré-requisitos de SO — **confirmação** (todos os itens) |
 | 5 | Copiar a mídia para `ora_stage_dir` com o nome que está no `ora_media` |
 | 6 | `playbooks/20_stage.yml` — recolhe a mídia (se configurado), verifica (presença pelo nome) e descompacta RU e one-offs |
@@ -222,14 +223,14 @@ servidores Oracle em `group_vars/oracle/main.yml`; o que é de um servidor só e
 | `ora_app_dir`, `ora_base`, `ora_inventory_dir` | inventário (`group_vars/oracle`) | layout OFA |
 | `ora_stage_dir` | inventário (`group_vars/oracle`) | onde o DBA deixa a mídia |
 | `ora_stage_collect_from` | host_vars | diretórios de onde a fase 20 pode mover a mídia para o stage (padrão `[]`) |
-| `ora_supported_os` | projeto (`playbooks/group_vars/all`) | escopo de SO aceito pelo gate |
+| `ora_supported_os` | projeto (`playbooks/group_vars/all`) | matriz de compatibilidade do gate: distribuição, major, release mínimo, kernel (flavor/série/mínimo) e RU mínima |
 | `ora_version` | inventário (`group_vars/oracle`) | release base da mídia, 4 partes (`19.3.0.0`) |
 | `ora_ru` | padrão no projeto (`media.yml`, `19.32.0.0`); o inventário escolhe outra por servidor (`host_vars`) ou cluster (`group_vars/<cluster>`) | RU aplicada na instalação; tem de ser uma entrada de `ora_media_catalog` |
 | `ora_media_catalog` / `ora_media` | projeto (`media.yml`) | um catálogo por RU (`file`, + `patchid` nos RUs e one-offs; sem checksum); o `ora_media` é o da RU escolhida |
 | `ora_install_type` | inventário (`group_vars/oracle_restart` ou `oracle_si`) | cenário: `restart_asm` ou `si_fs` |
 | `ora_db_data_mount`, `ora_db_data_dir`, `ora_db_fra_dir` | inventário (`group_vars/oracle_si`) | `si_fs`: `/u02` (tem de ser ponto de montagem), `/u02/app/oracle/oradata`, `<ORACLE_BASE>/fast_recovery_area` (OFA) |
 | `ora_asm` | host_vars | discos (`label` + `device` por `/dev/disk/by-id/`) e diskgroups; o 1º diskgroup é criado no gridSetup |
-| `ora_media.asmlib` | projeto (`media.yml`) | RPM `oracleasmlib` (file), baixado pelo DBA; a fase 30 confere a assinatura (`rpm -K`) |
+| `ora_media.asmlib.<major>` | projeto (`media.yml`) | RPM `oracleasmlib` (`file`) por major do Oracle Linux, baixado pelo DBA; a fase 30 confere a assinatura (`rpm -K`) |
 | `ora_media.cvu` | projeto (`media.yml`) | CVU avulso do MOS (patch 30839369): **não** usado na 19c em OL9 (sem dados de referência); mapeado para 26ai |
 | `ora_home_version` | inventário (`group_vars/oracle`) | `<major>.<ru>.0.0` tirado do `ora_ru`; nome dos homes |
 | `ora_grid_home` | inventário (`group_vars/oracle`) | `{{ ora_base }}/product/<major>.<ru>.0.0/grid`, ex.: `19.32.0.0` (OFA, standalone, dono único; nomenclatura da casa) |
